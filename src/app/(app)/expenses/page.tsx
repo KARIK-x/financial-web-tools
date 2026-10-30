@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/server/auth";
 import { getDb, many } from "@/server/db";
-import { countClaims, listClaims, EXPENSE_STATUSES } from "@/server/expenses";
+import { countClaims, listClaims, summarizeClaims, EXPENSE_STATUSES } from "@/server/expenses";
 import { formatNPR } from "@/lib/money";
 import { formatDateLong } from "@/lib/nepali-date";
 import { PageHeader, StatusBadge, EmptyState, Pagination, SourceTag } from "@/components/ui";
@@ -39,17 +39,9 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
     countClaims(db, user, filters),
     many<{ id: string; name: string }>(db, `SELECT id, name FROM expense_categories WHERE is_active ORDER BY sort_order`),
     many<{ id: string; name: string }>(db, `SELECT id, name FROM events ORDER BY starts_on DESC NULLS LAST LIMIT 100`),
-    many<{ n: number; total: number; verified: number }>(
-      db,
-      `SELECT COUNT(*)::int AS n, COALESCE(SUM(amount_paisa),0) AS total,
-              COALESCE(SUM(amount_paisa) FILTER (WHERE verification_state='VERIFIED'),0) AS verified
-         FROM expense_claims c
-        WHERE ($1::text IS NULL OR c.status = $1) AND ($2::text IS NULL OR c.category_id = $2)
-          AND ($3::text IS NULL OR c.date_ad >= $3) AND ($4::text IS NULL OR c.date_ad <= $4)`,
-      [filters.status ?? null, filters.categoryId ?? null, filters.from ?? null, filters.to ?? null],
-    ),
+    summarizeClaims(db, user, filters),
   ]);
-  const summary = sums[0] ?? { n: 0, total: 0, verified: 0 };
+  const summary = sums;
 
   const query: Record<string, string | undefined> = {
     status: filters.status, q: filters.q, from: filters.from, to: filters.to,

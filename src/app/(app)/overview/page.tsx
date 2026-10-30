@@ -69,17 +69,24 @@ export default async function OverviewPage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={`${period.label}`}
-        title={`Good to see you, ${firstName}`}
-        sub="Verified and unverified spending are kept apart on purpose. Nothing here is counted as verified until a second person checks the evidence."
-        actions={
-          <>
-            <Link className="btn" href="/reports">Reports</Link>
-            <Link className="btn btn-primary" href="/expenses/new">New expense</Link>
-          </>
-        }
-      />
+      <section className="hero-card">
+        <div className="hero-copy">
+          <div className="eyebrow">{period.label}</div>
+          <h1 className="hero-title">Good to see you, {firstName}.</h1>
+          <p className="hero-sub">
+            Verified and unverified spending are kept apart on purpose. Nothing here is counted as verified until a second person checks the evidence.
+          </p>
+          <div className="hero-actions">
+            <Link className="btn btn-accent" href="/expenses/new">Record expense</Link>
+            <Link className="btn btn-ghost" href="/reports">Open reports</Link>
+          </div>
+        </div>
+        <div className="hero-metric">
+          <div className="tiny muted" style={{ color: "rgba(255,255,255,0.72)" }}>Verified spend</div>
+          <div className="hero-number">{formatNPR(data.verified)}</div>
+          <div className="hero-foot">{data.verifiedCount} verified claim{data.verifiedCount === 1 ? "" : "s"} · {formatNPR(data.unverified)} still unverified</div>
+        </div>
+      </section>
 
       {allSynthetic ? (
         <div className="warn-box" style={{ marginBottom: 18 }}>

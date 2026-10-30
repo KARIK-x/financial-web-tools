@@ -19,7 +19,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
-import { createDatabase, many, money, one } from "../src/server/db";
+import { createDatabase, databaseConfigFromEnv, many, money, one } from "../src/server/db";
 import { hashPassword } from "../src/server/password";
 import { recordAudit } from "../src/server/audit";
 import {
@@ -104,8 +104,7 @@ async function syntheticReceipt(input: {
 }
 
 async function main() {
-  const dataDir = process.env.DATABASE_DIR ?? path.join(process.cwd(), ".data", "pglite");
-  const db = await createDatabase({ dataDir });
+  const db = await createDatabase(databaseConfigFromEnv());
 
   try {
     const existing = await one<{ users: number; claims: number; documents: number }>(
@@ -174,7 +173,7 @@ async function main() {
         memberId, userId,
         user: {
           id: userId, name: person.name, email, role: person.role, roleLabel: person.role,
-          memberId, isSynthetic: true, mustChangePassword: false, sessionId: "seed-session", permissions: perms.map((p) => p.permission as Permission),
+          memberId, isSynthetic: true, mustChangePassword: false, mfaEnabled: false, mfaPending: false, sessionId: "seed-session", permissions: perms.map((p) => p.permission as Permission),
         },
       };
     }

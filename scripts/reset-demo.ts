@@ -14,15 +14,14 @@
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { createDatabase, one } from "../src/server/db";
+import { createDatabase, databaseConfigFromEnv, one } from "../src/server/db";
 import { recordAudit } from "../src/server/audit";
 import { DOCUMENT_ROOT } from "../src/server/storage";
 
 const DEMO_EMAIL_DOMAIN = "@locus.demo";
 
 async function main() {
-  const dataDir = process.env.DATABASE_DIR ?? path.join(process.cwd(), ".data", "pglite");
-  const db = await createDatabase({ dataDir });
+  const db = await createDatabase(databaseConfigFromEnv());
 
   try {
     const users = await one<{ total: number; synthetic: number; foreign: number }>(

@@ -4,6 +4,9 @@ import { getDb, many, one } from "@/server/db";
 import { currentFiscalPeriod } from "@/server/reports";
 import { formatDateLong, formatTimestamp } from "@/lib/nepali-date";
 import { PageHeader, Stat, StatusBadge, EmptyState } from "@/components/ui";
+import { ActionForm } from "@/components/ActionForm";
+import { importHistoricalClaimsAction } from "@/app/actions/historical-import";
+import { importGenericSpreadsheetAction } from "@/app/actions/generic-import";
 import { Download, FileSpreadsheet, ShieldCheck, Upload } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -165,6 +168,51 @@ export default async function ImportExportPage() {
                 An export is a point-in-time extract, not a backup. Copy <code>.data/pglite</code> and <code>.data/documents</code> together while the app is stopped.
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 18 }}>
+        <div className="card-head">
+          <div>
+            <div className="section-title">Any spreadsheet (safe preview)</div>
+            <div className="section-sub">Stage arbitrary CSV exports for review. Rows are fingerprinted for duplicates; nothing is posted to the ledger.</div>
+          </div>
+          <Upload size={16} className="muted" />
+        </div>
+        <div className="card-body">
+          <ActionForm action={importGenericSpreadsheetAction} submitLabel="Preview or review" className="grid">
+            <div className="field">
+              <label className="label" htmlFor="generic-file">CSV file</label>
+              <input id="generic-file" name="file" type="file" accept=".csv,text/csv" required />
+            </div>
+            <label className="tiny" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input name="confirm" type="checkbox" /> Commit the staged rows after preview
+            </label>
+          </ActionForm>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 18 }}>
+        <div className="card-head">
+          <div>
+            <div className="section-title">Historical claims CSV (staged)</div>
+            <div className="section-sub">Preview first; nothing is written until you check the commit box. Imported claims stay unverified.</div>
+          </div>
+          <Upload size={16} className="muted" />
+        </div>
+        <div className="card-body">
+          <ActionForm action={importHistoricalClaimsAction} submitLabel="Preview or import" className="grid">
+            <div className="field">
+              <label className="label" htmlFor="hist-file">CSV file</label>
+              <input id="hist-file" name="file" type="file" accept=".csv,text/csv" required />
+            </div>
+            <label className="tiny" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input name="confirm" type="checkbox" /> Commit the staged valid rows after preview
+            </label>
+          </ActionForm>
+          <div className="tiny muted" style={{ marginTop: 8 }}>
+            Required columns: date, member (email or name), vendor, description, amount. Optional: claim_no, event, funding_source, documentation_status, missing_receipt_declaration, notes.
           </div>
         </div>
       </div>

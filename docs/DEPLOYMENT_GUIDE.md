@@ -62,6 +62,7 @@ Open `http://localhost:3000` → sign in with the email and the password from th
 | `LOCUS_ADMIN_NAME` | — | Alternative to `--name` |
 | `LOCUS_ADMIN_PASSWORD` | generated | Alternative to `--password`; avoid exporting secrets in shared shells |
 | `NODE_ENV` | — | Set to `production` for `Secure` session cookies |
+| `MFA_ENFORCE` | off | Set to `true` to require TOTP enrollment for ADMIN/FINANCE/EXECUTIVE |
 | `E2E_BASE_URL` | `http://localhost:3000` | Point Playwright at an already-running server |
 
 No `.env` file is required. If you use one, it is gitignored.
@@ -75,7 +76,7 @@ npm run dev            # development server (Turbopack)
 npm run build          # production build
 npm start              # serve the production build
 npm run typecheck      # tsc --noEmit
-npm test               # Vitest: 96 unit/integration tests
+npm test               # Vitest: 117 unit/integration tests
 npm run test:e2e       # Playwright: 6 browser tests (needs demo data + Chrome)
 npm run db:migrate     # apply pending SQL migrations
 ```
@@ -152,7 +153,14 @@ WantedBy=multi-user.target
 ```
 
 ### 5.6 Backups
-Set up the procedure in `BACKUP_AND_RESTORE.md` **before** entering real data. A backup that has never been restored is not a backup.
+Stop the app, then run the tested scripts:
+
+```bash
+npm run db:backup -- --out /secure/locus-backups/$(date +%Y%m%d-%H%M%S)
+npm run db:verify-backup -- --from /secure/locus-backups/<timestamp>
+```
+
+Set up the restore procedure in `BACKUP_AND_RESTORE.md` **before** entering real data. A backup that has never been restored is not a backup. Scheduled/offsite encrypted backups are not configured; that remains an operational task.
 
 ### 5.7 OCR
 Install Tesseract and language data if receipt OCR is required:
@@ -222,12 +230,14 @@ Logs go to stdout/stderr. Do not log request bodies or credentials.
 |---|---|
 | PGlite single process | One app instance; no horizontal scaling |
 | Local filesystem storage | No shared storage across hosts; documents unavailable if the volume is lost |
-| In-memory login rate limiting | Resets on restart; not shared across processes |
+| Durable rate limiting/lockout | Implemented in PostgreSQL; verify under the production topology |
 | No email/password reset | Admin must reset passwords manually |
-| No MFA | High-value roles rely on strong passwords + HTTPS |
-| No CSP header | XSS defence relies on React escaping and careful rendering |
+| MFA available, not enforced by default | Set `MFA_ENFORCE=true`; define a sole-admin break-glass procedure |
+| Static CSP with `unsafe-inline` | XSS defence is improved but not complete; nonce CSP is future work |
+| No malware scanning | Uploads are private and served as attachments; add a scanner for untrusted users |
+| No application-level encryption at rest | Use full-disk/volume encryption and encrypted backups |
 
-For a public deployment, migrate to managed PostgreSQL, object storage with signed URLs, a shared rate-limit store, and add MFA/email. Tracked in `TASK_QUEUE.md`.
+For a public deployment, migrate to managed PostgreSQL, use provider PITR, move documents to encrypted object storage, enforce MFA, add email, and complete the remaining security items. Tracked in `TASK_QUEUE.md`.
 
 ---
 
@@ -237,7 +247,10 @@ For a public deployment, migrate to managed PostgreSQL, object storage with sign
 - [ ] ADMIN created via CLI; credentials file deleted after first sign-in.
 - [ ] Password changed; all demo data absent (`npm run db:reset-demo` on a demo DB, or a fresh DB).
 - [ ] HTTPS enabled; `NODE_ENV=production`.
+- [ ] `MFA_ENFORCE=true`; at least two admins or a documented break-glass procedure.
 - [ ] `.data` permissions restricted; disk encryption on.
+- [ ] Backup created, verified, and restored into a disposable target.
+- [ ] CSP header present in a production response.
 - [ ] Backup + restore rehearsed.
 - [ ] Finance and Executive users created; role matrix reviewed.
 - [ ] Approval thresholds and compliance settings confirmed with the committee.

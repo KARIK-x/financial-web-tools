@@ -10,7 +10,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { createDatabase, one } from "../src/server/db";
+import { createDatabase, databaseConfigFromEnv, one } from "../src/server/db";
 import { hashPassword, passwordIssues } from "../src/server/password";
 import { recordAudit } from "../src/server/audit";
 
@@ -74,8 +74,7 @@ async function main() {
     process.exit(1);
   }
 
-  const dataDir = process.env.DATABASE_DIR ?? path.join(process.cwd(), ".data", "pglite");
-  const db = await createDatabase({ dataDir });
+  const db = await createDatabase(databaseConfigFromEnv());
 
   try {
     const existing = await one<{ id: string; role: string; member_id: string | null }>(

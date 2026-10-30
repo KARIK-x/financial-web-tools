@@ -1,6 +1,8 @@
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
 import { createHash } from "node:crypto";
+import { consumeRateLimit, clearRateLimit } from "./rate-limit";
+import { verifyMfaForUser } from "./mfa";
 import { getDb, one, type Db } from "./db";
 import { generateSessionToken, hashToken, verifyPassword } from "./password";
 import { can, ROLE_LABELS, type Permission, type Role } from "@/lib/permissions";
@@ -16,6 +18,8 @@ export type CurrentUser = {
   memberId: string | null;
   isSynthetic: boolean;
   mustChangePassword: boolean;
+  mfaEnabled: boolean;
+  mfaPending: boolean;
   sessionId: string;
   permissions: Permission[];
 };
@@ -28,6 +32,7 @@ type UserRow = {
   member_id: string | null;
   is_synthetic: boolean;
   must_change_password: boolean;
+  mfa_enabled: boolean;
 };
 
 const ELEVATED: Role[] = ["ADMIN", "FINANCE", "EXECUTIVE"];
@@ -51,10 +56,10 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const db = await getDb();
-  const row = await one<UserRow & { session_id: string; expires_at: Date }>(
+  const row = await one<UserRow & { session_id: string; expires_at: Date; mfa_pending: boolean }>(
     db,
-    `SELECT u.id, u.name, u.email, u.role, u.member_id, u.is_synthetic, u.must_change_password,
-            s.id AS session_id, s.expires_at
+    `SELECT u.id, u.name, u.email, u.role, u.member_id, u.is_synthetic, u.must_change_password, u.mfa_enabled,
+            s.id AS session_id, s.expires_at, s.mfa_pending
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND u.is_active = true`,
     [hashToken(token)],
@@ -74,14 +79,25 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     memberId: row.member_id,
     isSynthetic: row.is_synthetic,
     mustChangePassword: row.must_change_password,
+    mfaEnabled: row.mfa_enabled,
+    mfaPending: Boolean(row.mfa_pending),
     sessionId: row.session_id,
     permissions,
   };
 });
 
+export function mfaRequiredForRole(role: Role): boolean {
+  if (process.env.MFA_ENFORCE !== "true") return false;
+  return ELEVATED.includes(role);
+}
+
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) throw new Error("UNAUTHENTICATED");
+  if (user.mfaPending) throw new Error("MFA_PENDING");
+  if (mfaRequiredForRole(user.role) && !user.mfaEnabled && !user.mustChangePassword) {
+    throw new Error("MFA_ENROLLMENT_REQUIRED");
+  }
   return user;
 }
 
@@ -102,56 +118,89 @@ export async function requestContext(): Promise<{ ip: string | null; userAgent: 
   };
 }
 
-const loginAttempts = new Map<string, { count: number; firstAt: number }>();
+const MAX_FAILED_LOGINS = 8;
+const LOCK_MINUTES = 15;
 
-export function checkRateLimit(key: string): boolean {
-  const now = Date.now();
-  const entry = loginAttempts.get(key);
-  if (!entry || now - entry.firstAt > 15 * 60 * 1000) {
-    loginAttempts.set(key, { count: 1, firstAt: now });
-    return true;
-  }
-  entry.count += 1;
-  return entry.count <= 12;
+function loginKey(email: string, ip: string | null): string {
+  return `login:${createHash("sha256").update(`${email}|${ip ?? "local"}`).digest("hex").slice(0, 32)}`;
 }
 
-export type LoginResult = { ok: true; role: Role; mustChangePassword: boolean } | { ok: false; error: string };
+export type LoginResult =
+  | { ok: true; role: Role; mustChangePassword: boolean; mfaPending: boolean }
+  | { ok: false; error: string; mfaRequired?: boolean };
 
-export async function signIn(email: string, password: string, ip: string | null, userAgent: string | null): Promise<LoginResult> {
+async function recordFailedLogin(db: Db, userId: string): Promise<void> {
+  await db.query(
+    `UPDATE users
+        SET failed_logins = failed_logins + 1,
+            locked_until = CASE
+              WHEN failed_logins + 1 >= $2 THEN now() + ($3::text || ' minutes')::interval
+              ELSE locked_until
+            END
+      WHERE id = $1`,
+    [userId, MAX_FAILED_LOGINS, LOCK_MINUTES],
+  );
+}
+
+export async function signIn(
+  email: string,
+  password: string,
+  ip: string | null,
+  userAgent: string | null,
+  mfaCode: string | null = null,
+): Promise<LoginResult> {
   const db = await getDb();
   const normalized = email.trim().toLowerCase();
-  if (!checkRateLimit(`login:${normalized}:${ip ?? "local"}`)) {
-    return { ok: false, error: "Too many sign-in attempts. Try again in 15 minutes." };
+  const key = loginKey(normalized, ip);
+  const limit = await consumeRateLimit(db, key, 12, 15 * 60, 15 * 60);
+  if (!limit.allowed) {
+    return { ok: false, error: `Too many sign-in attempts. Try again in ${limit.retryAfterSeconds} seconds.` };
   }
-  const user = await one<{ id: string; role: Role; password_hash: string; is_active: boolean; locked_until: Date | null; must_change_password: boolean }>(
+  const user = await one<{
+    id: string; role: Role; password_hash: string; is_active: boolean; locked_until: Date | null;
+    must_change_password: boolean; mfa_enabled: boolean; mfa_secret: string | null; mfa_last_used_step: string | number | bigint | null;
+  }>(
     db,
-    `SELECT id, role, password_hash, is_active, locked_until, must_change_password FROM users WHERE lower(email) = $1`,
+    `SELECT id, role, password_hash, is_active, locked_until, must_change_password,
+            mfa_enabled, mfa_secret, mfa_last_used_step
+       FROM users WHERE lower(email) = $1`,
     [normalized],
   );
+  if (user?.locked_until && new Date(user.locked_until).getTime() > Date.now()) {
+    return { ok: false, error: "Account temporarily locked after repeated failed sign-ins. Try again later or ask the Finance Manager." };
+  }
   // Constant-ish work factor even for unknown emails.
   const hash = user?.password_hash ?? "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAA";
   const valid = await verifyPassword(password, hash);
   if (!user || !valid || !user.is_active) {
-    if (user) await db.query(`UPDATE users SET failed_logins = failed_logins + 1 WHERE id = $1`, [user.id]);
+    if (user) await recordFailedLogin(db, user.id);
     return { ok: false, error: "Email or password is incorrect." };
-  }
-  if (user.locked_until && new Date(user.locked_until).getTime() > Date.now()) {
-    return { ok: false, error: "Account temporarily locked. Contact the Finance Manager." };
   }
   if (!user.password_hash.startsWith("scrypt$")) {
     return { ok: false, error: "Account password must be reset by an administrator." };
   }
 
+  if (user.mfa_enabled) {
+    if (!mfaCode?.trim()) return { ok: false, error: "Enter the six-digit authenticator code.", mfaRequired: true };
+    const mfa = await verifyMfaForUser(db, user, mfaCode);
+    if (!mfa.ok) {
+      await recordFailedLogin(db, user.id);
+      return { ok: false, error: mfa.error ?? "The authentication code is invalid.", mfaRequired: true };
+    }
+  }
+
+  const enforceEnrollment = mfaRequiredForRole(user.role) && !user.mfa_enabled && !user.must_change_password;
   const token = generateSessionToken();
   const expires = new Date(Date.now() + sessionDurationMs(user.role));
   await db.transaction(async (tx) => {
     await tx.query(
-      `INSERT INTO sessions (id, token_hash, user_id, expires_at, ip, user_agent)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
-      [crypto.randomUUID(), hashToken(token), user.id, expires, ip, userAgent?.slice(0, 300) ?? null],
+      `INSERT INTO sessions (id, token_hash, user_id, expires_at, ip, user_agent, mfa_pending)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [crypto.randomUUID(), hashToken(token), user.id, expires, ip, userAgent?.slice(0, 300) ?? null, enforceEnrollment],
     );
-    await tx.query(`UPDATE users SET last_login_at = now(), failed_logins = 0 WHERE id = $1`, [user.id]);
+    await tx.query(`UPDATE users SET last_login_at = now(), failed_logins = 0, locked_until = NULL WHERE id = $1`, [user.id]);
   });
+  await clearRateLimit(db, key);
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -160,7 +209,7 @@ export async function signIn(email: string, password: string, ip: string | null,
     path: "/",
     expires,
   });
-  return { ok: true, role: user.role, mustChangePassword: user.must_change_password };
+  return { ok: true, role: user.role, mustChangePassword: user.must_change_password, mfaPending: enforceEnrollment };
 }
 
 export async function signOut(): Promise<void> {

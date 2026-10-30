@@ -1,8 +1,8 @@
 # DATA MODEL
 
 **Database:** PostgreSQL (PGlite 0.5.11 embedded at `.data/pglite`)
-**Migrations:** `db/migrations/001_init.sql` (schema + triggers), `db/migrations/002_reference.sql` (reference data, categories, role permissions, settings)
-**Tables:** 36 (34 domain + `schema_migrations` + staging)
+**Migrations:** `db/migrations/001_init.sql` (schema + triggers), `db/migrations/002_reference.sql` (reference data, categories, role permissions, settings), `db/migrations/003_operational_hardening.sql` (durable rate limits, accounting periods, MFA, OCR page provenance)
+**Tables:** 39 (including `schema_migrations` and staging tables)
 
 All money columns are `BIGINT` **paisa**. All timestamps are `timestamptz`. Business dates are `DATE` with an explicit `calendar` (`AD`/`BS`) where a human-entered date is involved. Identifiers are text UUIDs or stable slugs (`org_locus`, `cat_food`).
 
@@ -13,9 +13,12 @@ All money columns are `BIGINT` **paisa**. All timestamps are `timestamptz`. Busi
 | Table | Purpose | Key columns |
 |---|---|---|
 | `organizations` | The single workspace | `id`, `name`, `currency`, `fiscal_year_start_month` |
-| `users` | Login identities | `email` (unique, case-insensitive), `password_hash`, `role`, `is_active`, `is_synthetic`, `member_id` |
+| `users` | Login identities | `email` (unique, case-insensitive), `password_hash`, `role`, `is_active`, `is_synthetic`, `member_id`, `failed_logins`, `locked_until`, `mfa_enabled`, `mfa_secret`, `mfa_recovery_codes`, `mfa_enrolled_at`, `mfa_last_used_step` |
 | `members` | People who can be paid or own claims | `name`, `email`, `role_title`, `is_active` |
-| `sessions` | Server-side sessions | `token_hash` (unique), `user_id`, `expires_at`, `revoked_at` |
+| `sessions` | Server-side sessions | `token_hash` (unique), `user_id`, `expires_at`, `revoked_at`, `mfa_pending` |
+| `rate_limits` | Durable login/request limiter | `key`, `window_start`, `count`, `blocked_until` |
+| `accounting_periods` | Fiscal period close/lock | `fiscal_year`, `period_start`, `period_end`, `status`, close/reopen actor/reason |
+| `accounting_period_events` | Period close/reopen history | `period_id`, `action`, `reason`, `actor_user_id` |
 | `permissions` | Permission catalogue (19 rows) | `key`, `description` |
 | `role_permissions` | Role → permission matrix (54 rows) | `role`, `permission` |
 
@@ -54,6 +57,8 @@ Roles: `ADMIN`, `FINANCE`, `EXECUTIVE`, `EVENT_HEAD`, `MEMBER`, `AUDITOR`.
 - `direction ∈ {IN, OUT}`; transfers use `from_account_id`/`to_account_id`.
 - `status ∈ {RECORDED, VOID}`. Recorded rows cannot be deleted or re-amounted (trigger).
 - `journal_entry_id` links to the posted entry.
+- `reverses_id` links a reversal payment to the original; the original is marked `VOID` and is never edited.
+- Reversal rows are excluded from cashflow/paid/received aggregates to avoid double counting.
 
 ---
 
@@ -63,7 +68,7 @@ Roles: `ADMIN`, `FINANCE`, `EXECUTIVE`, `EVENT_HEAD`, `MEMBER`, `AUDITOR`.
 |---|---|
 | `document_batches` | Groups an upload session; `file_count` |
 | `documents` | Immutable file metadata + extracted fields |
-| `ocr_extractions` | One row per OCR attempt, with engine, version, raw text, confidence, error |
+| `ocr_extractions` | One row per OCR attempt, with engine, version, raw text, confidence, error, `pages`, `language` |
 
 `documents` stores `sha256` (unique), `storage_key`, `mime`, `size_bytes`, `doc_type`, `status`, `perceptual_hash`, `duplicate_of`, `duplicate_score`, `extracted` JSONB, `review_status`, `reviewed_by/at`. File bytes live only in `.data/documents`.
 
@@ -138,6 +143,8 @@ Every entry must balance (trigger). Posted lines are immutable (trigger). Accoun
 | `settings` | JSONB settings: approval thresholds, compliance, display, documentation, reconstruction |
 | `import_batches` / `import_rows` | Staging for future generic imports (schema present, UI limited) |
 | `schema_migrations` | Applied migration filenames |
+| `rate_limits` | Durable rate-limit counters and blocks |
+| `accounting_periods` / `accounting_period_events` | Period lock and its audit history |
 
 ---
 
@@ -153,10 +160,11 @@ Every entry must balance (trigger). Posted lines are immutable (trigger). Accoun
 | `allocations_balance` | Allocation totals must equal the claim amount |
 | `journal_must_balance` | Debits must equal credits |
 | `journal_lines_immutable` | Posted journal lines cannot be inserted/updated/deleted |
-| `payments_guard` | Recorded payments cannot be deleted or re-amounted |
+| `payments_guard` | Recorded payments cannot be deleted or re-amounted; reversals are linked, not overwritten |
 | `documents_immutable` | Document bytes/metadata cannot be deleted or altered |
 | `bank_lines_guard` | Imported statement lines are immutable except match fields |
 | `claims_terminal_state` | Terminal claim states cannot be left |
+| `rate_limits` / `accounting_periods` | Durable counters; closed periods reject postings in app code |
 
 ---
 
@@ -193,7 +201,7 @@ Indexes cover the access paths used by the UI: claims by claimant/status/date/ev
 
 ## 12. Changing the schema
 
-1. Add a new numbered migration (`003_*.sql`); never edit an applied migration.
+1. Add a new numbered migration (`004_*.sql`); never edit an applied migration.
 2. Run `npm run db:migrate`.
 3. For a local database created before a schema change, `rm -rf .data/pglite && npm run db:migrate` is the clean rebuild (this destroys local data — back up first).
 4. Update this document and `ACCOUNTING_RULES.md` if the change affects financial behaviour.

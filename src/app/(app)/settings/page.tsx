@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requirePagePermission } from "@/server/page-auth";
 import { getDb, many, one } from "@/server/db";
 import { getOrganization, getSettings } from "@/server/settings";
+import { currentFiscalPeriod } from "@/server/reports";
+import { listPeriods } from "@/server/periods";
 import { ocrCapability } from "@/server/ocr";
 import { PERMISSIONS, ROLES, ROLE_LABELS, type Permission, type Role } from "@/lib/permissions";
 import { paisaToDecimal } from "@/lib/money";
@@ -11,8 +13,11 @@ import { ActionForm } from "@/components/ActionForm";
 import {
   saveApprovalThresholdsAction, saveComplianceAction, saveDisplayAction,
   saveDocumentationAction, saveOrganizationAction, saveRolePermissionsAction,
+  closePeriodAction, reopenPeriodAction,
 } from "@/app/actions/settings";
 import { Database, HardDrive, ScanText, ShieldCheck } from "lucide-react";
+import { listDelegations } from "@/server/delegations";
+import { createDelegationAction, revokeDelegationAction } from "@/app/actions/delegations";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +46,7 @@ const PERMISSION_HINTS: Record<Permission, string> = {
 export default async function SettingsPage() {
   const user = await requirePagePermission("settings.manage");
   const db = await getDb();
-  const [settings, org, rolePermissions, counts, version, capability] = await Promise.all([
+  const [settings, org, rolePermissions, counts, version, capability, fiscal, periods, delegations, users] = await Promise.all([
     getSettings(db),
     getOrganization(db),
     many<{ role: string; permission: string }>(db, `SELECT role, permission FROM role_permissions ORDER BY role, permission`),
@@ -58,6 +63,10 @@ export default async function SettingsPage() {
     ),
     one<{ version: string }>(db, `SELECT version() AS version`),
     ocrCapability(),
+    currentFiscalPeriod(db),
+    listPeriods(db),
+    listDelegations(db),
+    many<{ id: string; name: string; role: string }>(db, `SELECT id, name, role FROM users WHERE is_active=true ORDER BY name`),
   ]);
 
   const granted = new Map<Role, Set<string>>();
@@ -244,6 +253,70 @@ export default async function SettingsPage() {
           </div>
         </div>
 
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <div className="section-title">Accounting period lock</div>
+              <div className="section-sub">Closing a period blocks new journal entries and claim submissions dated inside it. Reopening is audited.</div>
+            </div>
+            <span className="badge badge-gray">{fiscal.label}</span>
+          </div>
+          <div className="card-body grid" style={{ gap: 14 }}>
+            {periods.filter((p) => p.status === "CLOSED").length === 0 ? (
+              <div className="info-box">No period is closed. The current fiscal period is open for posting.</div>
+            ) : (
+              <div className="table-wrap">
+                <table className="data">
+                  <thead><tr><th>Period</th><th>Dates</th><th>Status</th><th>Audit</th><th /></tr></thead>
+                  <tbody>
+                    {periods.map((p) => (
+                      <tr key={p.id}>
+                        <td className="mono">{p.fiscal_year}</td>
+                        <td>{p.period_start} → {p.period_end}</td>
+                        <td><StatusBadge status={p.status === "CLOSED" ? "VERIFIED" : "ACTIVE"} label={p.status} /></td>
+                        <td className="tiny muted">
+                          {p.status === "CLOSED"
+                            ? <>Closed by {p.closed_by_name ?? "—"}<br />{p.closed_reason}</>
+                            : <>Reopened by {p.reopened_by_name ?? "—"}<br />{p.reopened_reason}</>}
+                        </td>
+                        <td className="right">
+                          {p.status === "CLOSED" ? (
+                            <ActionForm action={reopenPeriodAction} submitLabel="Reopen" submitClass="btn btn-small" className="inline-form" confirm="Reopen this period? The reason is written to the audit trail.">
+                              <input type="hidden" name="periodId" value={p.id} />
+                              <input name="reason" placeholder="Reason" required aria-label="Reopen reason" />
+                            </ActionForm>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <ActionForm action={closePeriodAction} submitLabel="Close period" className="form-grid" confirm="Close this accounting period? New postings inside it will be blocked.">
+              <div className="field">
+                <label className="label" htmlFor="fiscalYear">Fiscal year label</label>
+                <input id="fiscalYear" name="fiscalYear" defaultValue={fiscal.label.replace("Fiscal year ", "")} required />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="periodStart">Start</label>
+                <input id="periodStart" name="periodStart" type="date" defaultValue={fiscal.from} required />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="periodEnd">End</label>
+                <input id="periodEnd" name="periodEnd" type="date" defaultValue={fiscal.to} required />
+              </div>
+              <div className="field span-2">
+                <label className="label" htmlFor="periodReason">What was checked?</label>
+                <input id="periodReason" name="reason" placeholder="e.g. bank reconciliation complete; pending claims reviewed" required />
+              </div>
+            </ActionForm>
+            <div className="info-box">
+              A closed period is a server-side guard, not just a UI label. It does not replace bank reconciliation or approval review.
+            </div>
+          </div>
+        </div>
+
         <div className="card" style={{ background: "var(--surface-alt)" }}>
           <div className="card-head">
             <div>
@@ -342,6 +415,50 @@ export default async function SettingsPage() {
             </table>
           </div>
         </ActionForm>
+      </div>
+
+      <div className="card" style={{ marginTop: 18 }}>
+        <div className="card-head"><div className="section-title">Approval delegations</div><span className="tiny muted">{delegations.length}</span></div>
+        <div className="card-body" style={{ display: "grid", gap: 16 }}>
+          {delegations.length ? delegations.map((d) => (
+            <div key={d.id} className="list-row" style={{ alignItems: "center" }}>
+              <div style={{ flex: 1 }}>
+                <div className="small" style={{ fontWeight: 600 }}>{d.delegator_name} → {d.delegatee_name}</div>
+                <div className="tiny muted">{d.scope} · expires {d.expires_at.toISOString().slice(0,10)} · {d.reason}</div>
+              </div>
+              <StatusBadge status={d.revoked_at ? "REVOKED" : new Date(d.expires_at) > new Date() ? "ACTIVE" : "EXPIRED"} />
+              {!d.revoked_at ? (
+                <ActionForm action={revokeDelegationAction} submitLabel="Revoke" submitClass="btn btn-danger" hideStatus>
+                  <input type="hidden" name="delegationId" value={d.id} />
+                </ActionForm>
+              ) : null}
+            </div>
+          )) : <div className="tiny muted">No delegations.</div>}
+          <ActionForm action={createDelegationAction} submitLabel="Create delegation" className="form-grid">
+            <div className="field">
+              <label className="label">Delegatee</label>
+              <select name="delegateeId" required>
+                {users.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label className="label">Expires</label>
+              <input name="expiresAt" type="datetime-local" required />
+            </div>
+            <div className="field span-2">
+              <label className="label">Reason</label>
+              <input name="reason" required placeholder="Committee handover" />
+            </div>
+            <div className="field span-2">
+              <label className="label">Scope</label>
+              <select name="scope" defaultValue="ALL">
+                <option value="ALL">All claims</option>
+                <option value="EVENT">Event</option>
+                <option value="DEPARTMENT">Department</option>
+              </select>
+            </div>
+          </ActionForm>
+        </div>
       </div>
     </>
   );

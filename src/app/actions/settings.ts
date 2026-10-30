@@ -9,6 +9,7 @@ import { parseMoney } from "@/lib/money";
 import { PERMISSIONS, ROLES, type Permission, type Role } from "@/lib/permissions";
 import { bool, fail, optional, str } from "@/server/action-utils";
 import type { ActionResult } from "@/lib/action-result";
+import { closePeriod, reopenPeriod } from "@/server/periods";
 
 function parseNpr(fd: FormData, key: string): { ok: true; paisa: number } | { ok: false; error: string } {
   const raw = str(fd, key);
@@ -202,6 +203,40 @@ export async function saveRolePermissionsAction(_prev: ActionResult, fd: FormDat
     revalidatePath("/settings");
     revalidatePath("/overview");
     return { ok: true, message: "Permission matrix saved. Changes take effect on the next request for each signed-in user." };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function closePeriodAction(_prev: ActionResult, fd: FormData): Promise<ActionResult> {
+  try {
+    const user = await requirePermission("settings.manage");
+    const db = await getDb();
+    const result = await closePeriod(db, user, {
+      fiscalYear: str(fd, "fiscalYear"),
+      periodStart: str(fd, "periodStart"),
+      periodEnd: str(fd, "periodEnd"),
+      reason: str(fd, "reason"),
+    });
+    revalidatePath("/settings");
+    revalidatePath("/reports");
+    return { ok: true, message: `Period closed. New postings dated inside it are blocked until it is reopened. (${result.id})` };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function reopenPeriodAction(_prev: ActionResult, fd: FormData): Promise<ActionResult> {
+  try {
+    const user = await requirePermission("settings.manage");
+    const db = await getDb();
+    const result = await reopenPeriod(db, user, {
+      periodId: str(fd, "periodId"),
+      reason: str(fd, "reason"),
+    });
+    revalidatePath("/settings");
+    revalidatePath("/reports");
+    return { ok: true, message: `Period reopened with an audited reason. (${result.id})` };
   } catch (err) {
     return fail(err);
   }

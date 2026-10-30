@@ -3,23 +3,25 @@ import { getDb, many } from "@/server/db";
 import { memberAccountability } from "@/server/advances";
 import { formatNPR, formatNPRShort } from "@/lib/money";
 import { formatTimestamp } from "@/lib/nepali-date";
-import { ROLES, ROLE_LABELS } from "@/lib/permissions";
+import { ROLES, ROLE_LABELS, can } from "@/lib/permissions";
 import { PageHeader, Stat, StatusBadge } from "@/components/ui";
 import { ActionForm, QuickAction } from "@/components/ActionForm";
 import {
   createMemberAction, createUserAction, resetPasswordAction, toggleUserActiveAction,
 } from "@/app/actions/members";
+import { disableMfaAction } from "@/app/actions/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function MembersPage() {
-  await requirePagePermission("member.manage");
+  const actor = await requirePagePermission("member.manage");
+  const canResetMfa = can(actor.role, "settings.manage", actor.permissions);
   const db = await getDb();
   const [members, users, freeMembers] = await Promise.all([
     memberAccountability(db),
-    many<{ id: string; name: string; email: string; role: string; is_active: boolean; last_login_at: Date | null; member_id: string | null; must_change_password: boolean; is_synthetic: boolean }>(
+    many<{ id: string; name: string; email: string; role: string; is_active: boolean; last_login_at: Date | null; member_id: string | null; must_change_password: boolean; is_synthetic: boolean; mfa_enabled: boolean }>(
       db,
-      `SELECT id, name, email, role, is_active, last_login_at, member_id, must_change_password, is_synthetic FROM users ORDER BY is_active DESC, name`,
+      `SELECT id, name, email, role, is_active, last_login_at, member_id, must_change_password, is_synthetic, mfa_enabled FROM users ORDER BY is_active DESC, name`,
     ),
     many<{ id: string; name: string }>(
       db,
@@ -78,6 +80,7 @@ export default async function MembersPage() {
                     <td>{ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ?? u.role}</td>
                     <td>
                       <span className={`badge ${u.is_active ? "badge-green" : "badge-gray"}`}>{u.is_active ? "Active" : "Disabled"}</span>
+                      <span className={`badge ${u.mfa_enabled ? "badge-blue" : "badge-gray"}`} style={{ marginLeft: 4 }}>{u.mfa_enabled ? "MFA" : "No MFA"}</span>
                       {u.must_change_password ? <div className="row-sub">Password change pending</div> : null}
                     </td>
                     <td className="muted nowrap">{formatTimestamp(u.last_login_at)}</td>
@@ -91,6 +94,16 @@ export default async function MembersPage() {
                           </ActionForm>
                         </div>
                       </details>
+                      {u.mfa_enabled && actor.id !== u.id && canResetMfa ? (
+                        <details style={{ marginTop: 4 }}>
+                          <summary className="link small" style={{ cursor: "pointer" }}>Reset MFA</summary>
+                          <div style={{ marginTop: 8, minWidth: 240 }}>
+                            <ActionForm action={disableMfaAction} submitLabel="Reset & revoke sessions" submitClass="btn btn-sm btn-danger" hideStatus confirm="Reset this user's authenticator? Their sessions will be revoked and they must enrol again.">
+                              <input type="hidden" name="userId" value={u.id} />
+                            </ActionForm>
+                          </div>
+                        </details>
+                      ) : null}
                       <div style={{ marginTop: 4 }}>
                         <QuickAction
                           action={toggleUserActiveAction}

@@ -7,3 +7,10 @@ node_modules/
 test-results/
 playwright-report/
 *.tsbuildinfo
+
+# Local backups (never commit financial data or credentials)
+backups/
+
+# Local debug and OS files
+.DS_Store
+debug2.json

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { assertDateOpen } from "./periods";
 /** Anything that can run queries: the database or an open transaction. */
 export type Executor = {
   query<T>(query: string, params?: unknown[]): Promise<{ rows: T[] }>;
@@ -63,6 +64,7 @@ export async function postJournal(
     memo: string;
     sourceType: string;
     sourceId?: string | null;
+    reversesId?: string | null;
     lines: JournalLineInput[];
     createdBy: string;
   },
@@ -76,14 +78,16 @@ export async function postJournal(
   if (debit !== credit) throw new JournalError(`Unbalanced journal entry: debit ${debit} vs credit ${credit}.`);
   if (lines.some((l) => l.debit < 0 || l.credit < 0)) throw new JournalError("Journal amounts cannot be negative.");
 
+  await assertDateOpen(db, input.date, "This journal entry");
+
   const seq = await nextValue(db, "journal_seq");
   const id = randomUUID();
   const entryNo = `JE-${String(seq).padStart(6, "0")}`;
 
   await db.query(
-    `INSERT INTO journal_entries (id, entry_no, entry_date, memo, source_type, source_id, status, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,'DRAFT',$7)`,
-    [id, entryNo, input.date, input.memo, input.sourceType, input.sourceId ?? null, input.createdBy],
+    `INSERT INTO journal_entries (id, entry_no, entry_date, memo, source_type, source_id, status, reverses_id, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,'DRAFT',$7,$8)`,
+    [id, entryNo, input.date, input.memo, input.sourceType, input.sourceId ?? null, input.reversesId ?? null, input.createdBy],
   );
   for (const line of lines) {
     await db.query(

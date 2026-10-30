@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { getDb, one } from "@/server/db";
 import { hashPassword, passwordIssues, verifyPassword } from "@/server/password";
 import { getCurrentUser, requestContext, requireUser, signIn, signOut } from "@/server/auth";
+import { generateRecoveryCodes, hashRecoveryCode, resetMfaForUser, verifyTotp } from "@/server/mfa";
 import { can } from "@/lib/permissions";
 import { recordAudit } from "@/server/audit";
 import { fail, ok, str } from "@/server/action-utils";
@@ -15,8 +16,9 @@ export async function loginAction(_prev: ActionResult, fd: FormData): Promise<Ac
   if (!email || !password) return { ok: false, error: "Email and password are required." };
   try {
     const ctx = await requestContext();
-    const result = await signIn(email, password, ctx.ip, ctx.userAgent);
+    const result = await signIn(email, password, ctx.ip, ctx.userAgent, str(fd, "mfaCode") || null);
     if (!result.ok) return { ok: false, error: result.error };
+    if (result.mfaPending) return ok("Authenticator setup is required for privileged roles.", "/mfa-setup");
     return ok("Signed in.", result.mustChangePassword ? "/change-password" : "/overview");
   } catch (err) {
     return fail(err);
@@ -131,6 +133,62 @@ export async function changePasswordAction(_prev: ActionResult, fd: FormData): P
       summary: `${user.email} changed their password; other sessions were revoked.`,
     });
     return ok("Password changed. Other sessions have been signed out.", "/overview");
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function enableMfaAction(_prev: ActionResult, fd: FormData): Promise<ActionResult> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return { ok: false, error: "Your session expired. Sign in again." };
+    const code = str(fd, "code");
+    if (!/^\d{6}$/.test(code)) return { ok: false, error: "Enter the six-digit code from your authenticator app." };
+    const db = await getDb();
+    const row = await one<{ mfa_secret: string | null; mfa_enabled: boolean }>(
+      db, `SELECT mfa_secret, mfa_enabled FROM users WHERE id=$1`, [user.id],
+    );
+    if (!row) return { ok: false, error: "Account not found." };
+    if (row.mfa_enabled) return { ok: false, error: "Two-factor authentication is already enabled." };
+    if (!row.mfa_secret) return { ok: false, error: "Refresh this page to generate a new enrollment secret." };
+    const step = verifyTotp(row.mfa_secret, code);
+    if (step == null) return { ok: false, error: "That code is not valid. Check your device clock and try the current code." };
+    const recoveryCodes = generateRecoveryCodes();
+    const hashes = recoveryCodes.map(hashRecoveryCode);
+    await db.transaction(async (tx) => {
+      await tx.query(
+        `UPDATE users SET mfa_enabled=true, mfa_enrolled_at=now(), mfa_recovery_codes=$2::jsonb,
+                mfa_last_used_step=$3 WHERE id=$1`,
+        [user.id, JSON.stringify(hashes), step],
+      );
+      await tx.query(`UPDATE sessions SET mfa_pending=false WHERE id=$1`, [user.sessionId]);
+    });
+    await recordAudit(db, {
+      actorUserId: user.id, actorName: user.name, action: "MFA_ENABLED",
+      entityType: "user", entityId: user.id,
+      summary: "Two-factor authentication enabled; ten single-use recovery codes generated.",
+    });
+    return {
+      ok: true,
+      message: `Two-factor authentication is enabled. Save these single-use recovery codes now; they will not be shown again: ${recoveryCodes.join("  ")}`,
+    };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function disableMfaAction(_prev: ActionResult, fd: FormData): Promise<ActionResult> {
+  try {
+    const actor = await requireUser();
+    if (!can(actor.role, "settings.manage", actor.permissions)) {
+      return { ok: false, error: "Only the Finance Manager can reset another user's MFA." };
+    }
+    const userId = str(fd, "userId");
+    if (!userId) return { ok: false, error: "Select a user." };
+    if (userId === actor.id) return { ok: false, error: "Use the authenticator reset procedure for your own account; another administrator must reset it." };
+    const db = await getDb();
+    const target = await resetMfaForUser(db, actor, userId);
+    return { ok: true, message: `MFA reset for ${target.name}. They must enroll again at next sign-in.` };
   } catch (err) {
     return fail(err);
   }

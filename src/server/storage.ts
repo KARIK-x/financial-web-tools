@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
-import { unzipSync } from "fflate";
+import { Unzip, UnzipInflate } from "fflate";
 
 // Resolved at runtime only; kept out of the build trace so app source is not bundled as assets.
 export const DOCUMENT_ROOT =
@@ -36,13 +36,18 @@ export async function writeDocument(hash: string, filename: string, bytes: Buffe
 }
 
 export async function readDocument(storageKey: string): Promise<Buffer> {
-  if (storageKey.includes("..")) throw new Error("Invalid storage key");
-  return fs.readFile(path.join(DOCUMENT_ROOT, storageKey));
+  const root = path.resolve(DOCUMENT_ROOT);
+  const full = path.resolve(root, storageKey);
+  if (full !== root && !full.startsWith(root + path.sep)) throw new Error("Invalid storage key");
+  return fs.readFile(full);
 }
 
 export async function documentExists(storageKey: string): Promise<boolean> {
   try {
-    await fs.access(path.join(DOCUMENT_ROOT, storageKey));
+    const root = path.resolve(DOCUMENT_ROOT);
+    const full = path.resolve(root, storageKey);
+    if (full !== root && !full.startsWith(root + path.sep)) return false;
+    await fs.access(full);
     return true;
   } catch {
     return false;
@@ -91,18 +96,89 @@ export function safeFilename(name: string): string {
   return path.basename(name).replace(/[^\w.\- ()\u0900-\u097F]/g, "_").slice(0, 180) || "document";
 }
 
-export function extractZip(bytes: Buffer): StoredFile[] {
-  const files = unzipSync(new Uint8Array(bytes));
-  const out: StoredFile[] = [];
-  for (const [name, content] of Object.entries(files)) {
-    if (name.endsWith("/") || name.includes("__MACOSX") || name.startsWith(".") || name.includes("/.")) continue;
-    if (content.length === 0 || content.length > 40 * 1024 * 1024) continue;
-    const base = safeFilename(name);
-    out.push({ bytes: Buffer.from(content), filename: base, mime: mimeForFilename(base) });
-    if (out.length >= 500) break;
-  }
-  return out;
+export async function extractZip(bytes: Buffer): Promise<StoredFile[]> {
+  const MAX_FILE_BYTES = 40 * 1024 * 1024;
+  const MAX_TOTAL_BYTES = 100 * 1024 * 1024;
+  const MAX_FILES = 500;
+
+  return new Promise((resolve, reject) => {
+    const unzip = new Unzip();
+    unzip.register(UnzipInflate);
+    const out: StoredFile[] = [];
+    let totalBytes = 0;
+    let pendingFiles = 0;
+    let inputFinished = false;
+    let settled = false;
+
+    const finish = () => {
+      if (!settled && inputFinished && pendingFiles === 0) {
+        settled = true;
+        resolve(out);
+      }
+    };
+    const fail = (err: unknown) => {
+      if (!settled) {
+        settled = true;
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    };
+
+    unzip.onfile = (file) => {
+      if (file.name.endsWith("/") || file.name.includes("__MACOSX") || file.name.startsWith(".") || file.name.includes("/.")) {
+        return;
+      }
+      if (file.originalSize !== undefined && file.originalSize > MAX_FILE_BYTES) {
+        fail(new Error("Zip member expands to more than 40 MB"));
+        return;
+      }
+
+      pendingFiles++;
+      const chunks: Buffer[] = [];
+      let fileSize = 0;
+
+      file.ondata = (err, chunk, final) => {
+        if (err) {
+          file.terminate();
+          fail(err);
+          return;
+        }
+        fileSize += chunk.length;
+        totalBytes += chunk.length;
+        if (fileSize > MAX_FILE_BYTES || totalBytes > MAX_TOTAL_BYTES) {
+          file.terminate();
+          fail(new Error(fileSize > MAX_FILE_BYTES ? "Zip member expands to more than 40 MB" : "Zip archive expands to more than 100 MB"));
+          return;
+        }
+        chunks.push(Buffer.from(chunk));
+        if (!final) return;
+
+        pendingFiles--;
+        if (fileSize > 0 && out.length < MAX_FILES) {
+          const data = Buffer.concat(chunks);
+          const base = safeFilename(file.name);
+          out.push({ bytes: data, filename: base, mime: mimeForFilename(base) });
+        }
+        if (pendingFiles === 0 && inputFinished) finish();
+      };
+
+      try {
+        file.start();
+      } catch (err) {
+        pendingFiles--;
+        fail(err);
+      }
+    };
+
+    try {
+      unzip.push(new Uint8Array(bytes), true);
+      inputFinished = true;
+      if (pendingFiles === 0) finish();
+    } catch (err) {
+      fail(err);
+    }
+  });
 }
+
 
 export function mimeForFilename(name: string): string {
   const ext = name.toLowerCase().split(".").pop() ?? "";

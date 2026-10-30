@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/server/auth";
-import { getDb, one } from "@/server/db";
-import { getDocument } from "@/server/documents";
+import { getDb } from "@/server/db";
+import { canAccessDocument, getDocument } from "@/server/documents";
 import { readDocument } from "@/server/storage";
-import { can } from "@/lib/permissions";
+import { malwareScanRequired } from "@/server/malware";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +20,13 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const doc = await getDocument(db, id);
   if (!doc) return new NextResponse("Not found", { status: 404 });
 
-  const access = await one<{ uploaded_by: string | null; claimant: string | null }>(
-    db,
-    `SELECT d.uploaded_by, c.claimant_user_id AS claimant
-       FROM documents d LEFT JOIN expense_claims c ON c.id = d.claim_id WHERE d.id = $1`,
-    [id],
-  );
-  const allowed = can(user.role, "document.view.all", user.permissions)
-    || access?.uploaded_by === user.id
-    || (access?.claimant != null && access.claimant === user.id);
-  if (!allowed) return new NextResponse("Forbidden", { status: 403 });
+  if (!(await canAccessDocument(db, user, id))) return new NextResponse("Forbidden", { status: 403 });
+  if (doc.scan_status === "INFECTED") {
+    return new NextResponse("This file is quarantined because a malware signature matched. Contact the Finance Manager.", { status: 451 });
+  }
+  if (malwareScanRequired() && doc.scan_status !== "CLEAN") {
+    return new NextResponse("This file has not completed the required malware scan and cannot be downloaded.", { status: 423 });
+  }
 
   let bytes: Buffer;
   try {

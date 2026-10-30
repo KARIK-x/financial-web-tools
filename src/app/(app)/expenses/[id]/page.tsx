@@ -306,6 +306,30 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
             </div>
           </div>
 
+          {claim.items?.length ? (
+            <div className="card">
+              <div className="card-head"><div className="section-title">Line items</div><span className="badge badge-gray">{claim.items.length}</span></div>
+              <div className="table-wrap">
+                <table className="data">
+                  <thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th className="right">Unit price</th><th className="right">Discount</th><th className="right">Tax</th><th className="right">Line total</th></tr></thead>
+                  <tbody>
+                    {claim.items.map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.description}</td>
+                        <td className="mono">{item.quantity}</td>
+                        <td>{item.unit ?? "—"}</td>
+                        <td className="right mono">{formatNPR(Number(item.unit_price_paisa))}</td>
+                        <td className="right mono">{formatNPR(Number(item.discount_paisa))}</td>
+                        <td className="right mono">{formatNPR(Number(item.tax_paisa))}</td>
+                        <td className="right mono">{formatNPR(Number(item.line_total_paisa))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
           <div className="card">
             <div className="card-head"><div className="section-title">Allocation</div></div>
             <div className="card-body" style={{ paddingTop: 6, paddingBottom: 6 }}>

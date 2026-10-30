@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   const user = await getCurrentUser();
-  if (user) redirect(user.mustChangePassword ? "/change-password" : "/overview");
+  if (user) redirect(user.mustChangePassword ? "/change-password" : user.mfaPending ? "/mfa-setup" : "/overview");
 
   const db = await getDb();
   const counts = await one<{ users: number; synthetic: number }>(
@@ -40,6 +40,13 @@ export default async function LoginPage() {
             <div className="auth-point"><span className="tick">✓</span><span><b>Real double-entry.</b> Approvals, payments and receipts post balanced journal entries.</span></div>
             <div className="auth-point"><span className="tick">✓</span><span><b>Nothing hidden.</b> Unverified spend, missing documents and unreconciled lines stay visible.</span></div>
           </div>
+
+          <div className="auth-ledger">
+            <div className="auth-ledger-row"><span>Cash on hand</span><span className="num">NPR 1,24,500.00</span></div>
+            <div className="auth-ledger-row"><span>Verified spend</span><span className="num">NPR 86,320.00</span></div>
+            <div className="auth-ledger-row"><span>Awaiting approval</span><span className="num">NPR 14,200.00</span></div>
+            <div className="auth-ledger-foot">Sample ledger · live data stays private</div>
+          </div>
         </div>
         <div className="auth-kicker">Financial year {fiscalYearBsFor(todayISO())} · NPR</div>
       </section>
@@ -60,6 +67,11 @@ export default async function LoginPage() {
                 <label className="label" htmlFor="password">Password</label>
                 <input id="password" name="password" type="password" autoComplete="current-password" required minLength={8} />
               </div>
+              <div className="field">
+                <label className="label" htmlFor="mfaCode">Authenticator or recovery code <span className="muted">(if enabled)</span></label>
+                <input id="mfaCode" name="mfaCode" type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="123456 or ABCD-EFGHI" />
+                <span className="hint">Privileged accounts can enroll an authenticator after signing in.</span>
+              </div>
             </ActionForm>
           </div>
 
@@ -71,8 +83,8 @@ export default async function LoginPage() {
           ) : null}
 
           <div className="auth-foot">
-            Sessions are server-side and expire automatically. Contact the Finance Manager if you need an account or a
-            password reset. <Link className="link" href="/setup">First-time setup</Link>
+            Sessions are server-side and expire automatically. <Link className="link" href="/forgot-password">Forgot password?</Link>{" "}
+            Contact the Finance Manager if you need an account. <Link className="link" href="/setup">First-time setup</Link>
           </div>
         </div>
       </section>

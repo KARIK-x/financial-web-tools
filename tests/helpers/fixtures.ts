@@ -43,6 +43,8 @@ export async function createPerson(db: Db, spec: PersonSpec): Promise<CurrentUse
     memberId: spec.member === false ? null : memberId,
     isSynthetic: spec.synthetic ?? false,
     mustChangePassword: false,
+    mfaEnabled: false,
+    mfaPending: false,
     sessionId: "test-session",
     permissions: [...DEFAULT_ROLE_PERMISSIONS[spec.role]],
   };

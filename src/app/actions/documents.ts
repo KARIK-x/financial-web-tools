@@ -2,9 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser, requestContext } from "@/server/auth";
-import { getDb, one } from "@/server/db";
-import { createBatch, processDocumentOcr, saveDocumentCorrection, uploadOne } from "@/server/documents";
-import { recordAudit } from "@/server/audit";
+import { getDb } from "@/server/db";
+import { attachDocumentToClaim, createBatch, processDocumentOcr, reviewDocument, saveDocumentCorrection, uploadOne } from "@/server/documents";
 import { bool, fail, file, optional, str } from "@/server/action-utils";
 import type { ActionResult } from "@/lib/action-result";
 
@@ -100,18 +99,7 @@ export async function reviewDocumentAction(_prev: ActionResult, fd: FormData): P
     const db = await getDb();
     const documentId = str(fd, "documentId");
     const accept = bool(fd, "accept");
-    await db.query(
-      `UPDATE documents SET review_status = $2, reviewed_by = $3, reviewed_at = now(),
-              status = CASE WHEN $2 = 'ACCEPTED' THEN 'REVIEWED' ELSE 'NEEDS_REVIEW' END
-        WHERE id = $1`,
-      [documentId, accept ? "ACCEPTED" : "REJECTED", user.id],
-    );
-    await recordAudit(db, {
-      actorUserId: user.id, actorName: user.name,
-      action: accept ? "DOCUMENT_ACCEPTED" : "DOCUMENT_REJECTED",
-      entityType: "document", entityId: documentId,
-      summary: accept ? "Reviewer accepted the extracted fields" : "Reviewer rejected the extracted fields",
-    });
+    await reviewDocument(db, user, { documentId, accept });
     revalidatePath(`/receipts/${documentId}`);
     revalidatePath("/receipts");
     return { ok: true, message: accept ? "Document marked reviewed." : "Document marked as needing rework." };
@@ -127,27 +115,11 @@ export async function attachDocumentAction(_prev: ActionResult, fd: FormData): P
     const documentId = str(fd, "documentId");
     const claimNo = str(fd, "claimNo");
     if (!claimNo) return { ok: false, error: "Enter the claim number, e.g. LOC-2026-0001." };
-    const claim = await one<{ id: string; claim_no: string; status: string }>(
-      db, `SELECT id, claim_no, status FROM expense_claims WHERE upper(claim_no) = upper($1)`, [claimNo],
-    );
-    if (!claim) return { ok: false, error: `No claim found with number ${claimNo}.` };
-    if (["REJECTED", "WITHDRAWN"].includes(claim.status)) return { ok: false, error: "This claim is closed; attach the receipt to a new claim instead." };
 
-    const already = await one<{ id: string }>(db, `SELECT id FROM documents WHERE claim_id = $1 AND id <> $2`, [claim.id, documentId]);
-    await db.query(`UPDATE documents SET claim_id = $2, doc_type = CASE WHEN doc_type='UNKNOWN' THEN 'RECEIPT' ELSE doc_type END WHERE id = $1`, [documentId, claim.id]);
-    await db.query(
-      `UPDATE expense_claims SET documentation_state = 'COMPLETE'
-        WHERE id = $1 AND documentation_state <> 'COMPLETE'`,
-      [claim.id],
-    );
-    await recordAudit(db, {
-      actorUserId: user.id, actorName: user.name, action: "DOCUMENT_ATTACHED",
-      entityType: "document", entityId: documentId,
-      summary: `Receipt attached to ${claim.claim_no}${already ? " (claim already had other documents)" : ""}`,
-    });
+    const result = await attachDocumentToClaim(db, user, { documentId, claimNo });
     revalidatePath(`/receipts/${documentId}`);
-    revalidatePath(`/expenses/${claim.id}`);
-    return { ok: true, message: `Attached to ${claim.claim_no}.` };
+    revalidatePath(`/expenses/${result.claimId}`);
+    return { ok: true, message: `Attached to ${result.claimNo}.` };
   } catch (err) {
     return fail(err);
   }

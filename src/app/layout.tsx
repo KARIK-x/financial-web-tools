@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Inter, Instrument_Serif } from "next/font/google";
+import { Plus_Jakarta_Sans, Fraunces } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const instrument = Instrument_Serif({ subsets: ["latin"], weight: "400", variable: "--font-instrument", display: "swap" });
+const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap" });
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap" });
 
 export const metadata: Metadata = {
   title: "LOCUS Finance",
@@ -13,8 +13,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${instrument.variable}`}>
-      <body>{children}</body>
+    <html lang="en" className={`${jakarta.variable} ${fraunces.variable}`}>
+      <body>
+      <a className="skip-link" href="#main-content">Skip to content</a>
+      <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('locus-theme');document.documentElement.setAttribute('data-theme', t==='dark' ? 'dark' : 'light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();` }} />
+      <main id="main-content" role="main">{children}</main>
+    </body>
     </html>
   );
 }

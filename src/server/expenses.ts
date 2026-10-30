@@ -8,6 +8,12 @@ import { parseMoney } from "@/lib/money";
 import { adToBs, isValidISODate, todayISO } from "@/lib/nepali-date";
 import type { CurrentUser } from "./auth";
 import { can } from "@/lib/permissions";
+import { assertDateOpen } from "./periods";
+import { notifyClaimEvent } from "./notifications";
+import { lockAndAssertFunds } from "./funds";
+import { inferCategoryId } from "./categorization";
+import { hasActiveDelegation } from "./delegations";
+import { notifyClaimSubmittedInApp } from "./notifications-center";
 
 export class ExpenseError extends Error {}
 
@@ -97,7 +103,7 @@ export async function listClaims(db: Db, viewer: CurrentUser, filters: ClaimFilt
   params.push(filters.offset ?? 0);
   const offsetIdx = params.length;
 
-  return many<ClaimRow>(
+  const rows = await many<ClaimRow>(
     db,
     `SELECT c.id, c.claim_no, c.claimant_user_id, cu.name AS claimant_name, c.paid_by_member_id,
             pm.name AS paid_by_name, to_char(c.date_ad,'YYYY-MM-DD') AS date_ad, c.date_bs,
@@ -107,7 +113,7 @@ export async function listClaims(db: Db, viewer: CurrentUser, filters: ClaimFilt
             c.verification_state, c.documentation_state, c.funding_source, c.reimbursement_required, c.description,
             c.created_at, c.submitted_at, c.is_synthetic, c.source_type,
             (SELECT COUNT(*)::int FROM documents d WHERE d.claim_id = c.id) AS docs,
-            COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.claim_id = c.id AND p.status='RECORDED'
+            COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.claim_id = c.id AND p.status='RECORDED' AND p.reverses_payment_id IS NULL
               AND p.type IN ('REIMBURSEMENT','EXPENSE_PAYMENT')), 0) AS paid_paisa
        FROM expense_claims c
        JOIN users cu ON cu.id = c.claimant_user_id
@@ -120,6 +126,41 @@ export async function listClaims(db: Db, viewer: CurrentUser, filters: ClaimFilt
       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
     params,
   );
+  return rows.map((row) => ({ ...row, paid_paisa: money(row.paid_paisa) }));
+}
+
+export async function summarizeClaims(
+  db: Db,
+  viewer: CurrentUser,
+  filters: ClaimFilters = {},
+): Promise<{ n: number; total: number; verified: number }> {
+  const params: unknown[] = [];
+  const clauses: string[] = [];
+  viewerScope(viewer, params, clauses);
+  if (filters.status) { params.push(filters.status); clauses.push(`c.status = $${params.length}`); }
+  if (filters.eventId) { params.push(filters.eventId); clauses.push(`c.event_id = $${params.length}`); }
+  if (filters.departmentId) { params.push(filters.departmentId); clauses.push(`c.department_id = $${params.length}`); }
+  if (filters.categoryId) { params.push(filters.categoryId); clauses.push(`c.category_id = $${params.length}`); }
+  if (filters.memberId) { params.push(filters.memberId); clauses.push(`c.paid_by_member_id = $${params.length}`); }
+  if (filters.claimant) { params.push(filters.claimant); clauses.push(`c.claimant_user_id = $${params.length}`); }
+  if (filters.from) { params.push(filters.from); clauses.push(`c.date_ad >= $${params.length}`); }
+  if (filters.to) { params.push(filters.to); clauses.push(`c.date_ad <= $${params.length}`); }
+  if (filters.verification) { params.push(filters.verification); clauses.push(`c.verification_state = $${params.length}`); }
+  if (filters.documentation) { params.push(filters.documentation); clauses.push(`c.documentation_state = $${params.length}`); }
+  if (filters.pendingOnly) clauses.push(`c.status IN ('SUBMITTED','UNDER_REVIEW')`);
+  if (filters.q) {
+    params.push(`%${filters.q.toLowerCase()}%`);
+    clauses.push(`(lower(c.claim_no) LIKE $${params.length} OR lower(c.description) LIKE $${params.length} OR lower(COALESCE(c.vendor_name_raw,'')) LIKE $${params.length})`);
+  }
+  const row = await one<{ n: number; total: string | number | bigint; verified: string | number | bigint }>(
+    db,
+    `SELECT COUNT(*)::int AS n, COALESCE(SUM(c.amount_paisa),0) AS total,
+            COALESCE(SUM(c.amount_paisa) FILTER (WHERE c.verification_state='VERIFIED'),0) AS verified
+       FROM expense_claims c
+      ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}`,
+    params,
+  );
+  return { n: Number(row?.n ?? 0), total: money(row?.total), verified: money(row?.verified) };
 }
 
 export async function countClaims(db: Db, viewer: CurrentUser, filters: ClaimFilters = {}): Promise<number> {
@@ -163,7 +204,7 @@ export async function getClaim(db: Db, viewer: CurrentUser, id: string) {
             pm.name AS paid_by_name, COALESCE(v.name, c.vendor_name_raw) AS vendor_name,
             cat.name AS category_name, cat.code AS category_code, e.name AS event_name,
             (SELECT COUNT(*)::int FROM documents d WHERE d.claim_id = c.id) AS docs,
-            COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.claim_id = c.id AND p.status='RECORDED'
+            COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.claim_id = c.id AND p.status='RECORDED' AND p.reverses_payment_id IS NULL
               AND p.type IN ('REIMBURSEMENT','EXPENSE_PAYMENT')), 0) AS paid_paisa
        FROM expense_claims c
        JOIN users cu ON cu.id = c.claimant_user_id
@@ -178,7 +219,7 @@ export async function getClaim(db: Db, viewer: CurrentUser, id: string) {
   if (claim.claimant_user_id !== viewer.id && !can(viewer.role, "expense.view.all", viewer.permissions)) {
     throw new ExpenseError("You do not have access to this claim.");
   }
-  const [allocations, approvals, payments, documents, advance] = await Promise.all([
+  const [allocations, approvals, payments, documents, advance, items] = await Promise.all([
     many<{ id: string; event_id: string | null; event_name: string | null; department_id: string | null; department_name: string | null; amount_paisa: number }>(
       db,
       `SELECT a.id, a.event_id, e.name AS event_name, a.department_id, d.name AS department_name, a.amount_paisa
@@ -214,8 +255,14 @@ export async function getClaim(db: Db, viewer: CurrentUser, id: string) {
     claim.advance_id
       ? one<{ id: string; ref: string; amount_paisa: number; status: string }>(db, `SELECT id, ref, amount_paisa, status FROM advances WHERE id=$1`, [claim.advance_id])
       : Promise.resolve(null),
+    many<{ id: string; description: string; quantity: string; unit: string | null; unit_price_paisa: number; discount_paisa: number; tax_paisa: number; line_total_paisa: number; category_id: string | null }>(
+      db,
+      `SELECT id, description, quantity::text AS quantity, unit, unit_price_paisa, discount_paisa, tax_paisa, line_total_paisa, category_id
+         FROM expense_items WHERE claim_id = $1 ORDER BY created_at`,
+      [id],
+    ),
   ]);
-  return { ...claim, allocations, approvals, payments, documents, advance };
+  return { ...claim, paid_paisa: money(claim.paid_paisa), allocations, approvals, payments, documents, advance, items };
 }
 
 const createSchema = z.object({
@@ -226,7 +273,7 @@ const createSchema = z.object({
   description: z.string().trim().min(3, "Describe what was purchased.").max(300),
   businessPurpose: z.string().trim().max(500).optional().nullable(),
   amount: z.string().min(1, "Amount is required."),
-  categoryId: z.string().min(1, "Category is required."),
+  categoryId: z.string().optional().nullable(),
   eventId: z.string().optional().nullable(),
   departmentId: z.string().optional().nullable(),
   fundingSource: z.enum(["PERSONAL", "LOCUS_CASH", "LOCUS_BANK"]),
@@ -242,6 +289,15 @@ const createSchema = z.object({
     eventId: z.string().optional().nullable(),
     departmentId: z.string().optional().nullable(),
     amount: z.string(),
+  })).optional().nullable(),
+  items: z.array(z.object({
+    description: z.string().trim().min(1).max(200),
+    quantity: z.string().min(1),
+    unit: z.string().trim().max(20).optional().nullable(),
+    unitPrice: z.string().min(1),
+    discount: z.string().optional().nullable(),
+    tax: z.string().optional().nullable(),
+    categoryId: z.string().optional().nullable(),
   })).optional().nullable(),
 });
 
@@ -260,11 +316,15 @@ export async function createExpense(
   if (!can(user.role, "expense.submit", user.permissions)) throw new ExpenseError("You cannot submit expense claims.");
   const amount = parseMoney(input.amount);
   if (!amount.ok) throw new ExpenseError(amount.error);
+  await assertDateOpen(db, input.date, "This expense date");
   if (!user.memberId) throw new ExpenseError("Your login is not linked to a member record. Ask the Finance Manager to link it.");
 
   const settings = await getSettings(db);
+  const resolvedCategoryId = input.categoryId && input.categoryId !== "auto"
+    ? input.categoryId
+    : await inferCategoryId(db, `${input.vendorName} ${input.description}`);
   const category = await one<{ id: string; requires_receipt: boolean; name: string }>(
-    db, `SELECT id, requires_receipt, name FROM expense_categories WHERE id = $1 AND is_active = true`, [input.categoryId],
+    db, `SELECT id, requires_receipt, name FROM expense_categories WHERE id = $1 AND is_active = true`, [resolvedCategoryId],
   );
   if (!category) throw new ExpenseError("Expense category not found.");
 
@@ -276,26 +336,47 @@ export async function createExpense(
   }
 
   if (input.advanceId) {
-    const adv = await one<{ id: string; member_id: string; status: string }>(
-      db, `SELECT id, member_id, status FROM advances WHERE id = $1`, [input.advanceId],
+    if (input.fundingSource === "PERSONAL") {
+      throw new ExpenseError("An advance-funded claim cannot be marked as paid from personal funds. Use the advance funding source.");
+    }
+    const adv = await one<{
+      id: string; member_id: string; status: string; outstanding: number;
+    }>(
+      db,
+      `SELECT a.id, a.member_id, a.status,
+              GREATEST(0, a.amount_paisa
+                - COALESCE((SELECT SUM(c.amount_paisa) FROM expense_claims c
+                    WHERE c.advance_id=a.id AND c.status NOT IN ('DRAFT','SUBMITTED','UNDER_REVIEW','REJECTED','WITHDRAWN')),0)
+                - COALESCE((SELECT SUM(s.returned_paisa) FROM advance_settlements s WHERE s.advance_id=a.id),0)) AS outstanding
+         FROM advances a WHERE a.id = $1`,
+      [input.advanceId],
     );
     if (!adv || adv.status !== "OUTSTANDING") throw new ExpenseError("The selected advance is not outstanding.");
     if (adv.member_id !== user.memberId) throw new ExpenseError("You can only account expenses against your own advance.");
+    if (amount.paisa > money(adv.outstanding)) {
+      throw new ExpenseError(`This claim exceeds the outstanding advance balance of NPR ${(money(adv.outstanding) / 100).toFixed(2)}.`);
+    }
   }
 
   const reimbursementRequired = input.fundingSource === "PERSONAL";
   const documentationState = hasDoc ? "COMPLETE" : declaration ? "MISSING_DECLARED" : "MISSING_UNDECLARED";
 
-  // Block exact re-submission of the same receipt to a second claim.
+  // Validate every supplied document and block re-use across claims. A receipt
+  // may support one claim; a genuinely different copy must be uploaded and reviewed.
   for (const docId of documentIds) {
-    const duplicate = await one<{ claim_no: string; amount_paisa: number; claimant_user_id: string }>(
+    const doc = await one<{ id: string; uploaded_by: string | null; claim_id: string | null; claim_no: string | null; claim_status: string | null }>(
       db,
-      `SELECT c.claim_no, c.amount_paisa, c.claimant_user_id FROM documents d JOIN expense_claims c ON c.id = d.claim_id
-        WHERE d.id = $1 AND c.status NOT IN ('REJECTED','WITHDRAWN')`,
+      `SELECT d.id, d.uploaded_by, d.claim_id, c.claim_no, c.status AS claim_status
+         FROM documents d LEFT JOIN expense_claims c ON c.id = d.claim_id
+        WHERE d.id = $1`,
       [docId],
     );
-    if (duplicate && duplicate.claimant_user_id === user.id && duplicate.amount_paisa === amount.paisa) {
-      throw new ExpenseError(`This receipt is already attached to claim ${duplicate.claim_no}.`);
+    if (!doc) throw new ExpenseError("A selected document no longer exists. Upload it again.");
+    if (doc.uploaded_by !== user.id && !can(user.role, "document.review", user.permissions)) {
+      throw new ExpenseError("You can only attach documents you uploaded.");
+    }
+    if (doc.claim_id && !["REJECTED", "WITHDRAWN"].includes(doc.claim_status ?? "")) {
+      throw new ExpenseError(`This receipt is already attached to claim ${doc.claim_no ?? "another claim"}.`);
     }
   }
 
@@ -324,6 +405,37 @@ export async function createExpense(
   }
   if (allocationTotal !== amount.paisa) throw new ExpenseError("Split allocations must add up to the expense total.");
 
+  // Item-level details must reconcile with the declared total.
+  const items = (input.items ?? []).map((item) => {
+    const qty = Number(item.quantity);
+    const unitPrice = parseMoney(item.unitPrice);
+    const discount = item.discount && item.discount.trim() && item.discount.trim() !== "0"
+      ? parseMoney(item.discount) : { ok: true as const, paisa: 0 };
+    const tax = item.tax && item.tax.trim() && item.tax.trim() !== "0"
+      ? parseMoney(item.tax) : { ok: true as const, paisa: 0 };
+    if (!Number.isFinite(qty) || qty <= 0) throw new ExpenseError("Item quantity must be greater than zero.");
+    if (!unitPrice.ok) throw new ExpenseError(unitPrice.error);
+    if (!discount.ok) throw new ExpenseError(discount.error);
+    if (!tax.ok) throw new ExpenseError(tax.error);
+    const lineTotal = Math.max(0, qty * unitPrice.paisa - discount.paisa + tax.paisa);
+    return {
+      description: item.description,
+      quantity: qty,
+      unit: item.unit ?? null,
+      unitPricePaisa: unitPrice.paisa,
+      discountPaisa: discount.paisa,
+      taxPaisa: tax.paisa,
+      lineTotalPaisa: Math.round(lineTotal),
+      categoryId: item.categoryId && item.categoryId !== "auto" ? item.categoryId : resolvedCategoryId,
+    };
+  });
+  if (items.length) {
+    const itemTotal = items.reduce((s, i) => s + i.lineTotalPaisa, 0);
+    if (itemTotal !== amount.paisa) {
+      throw new ExpenseError(`Item totals (${(itemTotal / 100).toFixed(2)}) do not match the expense total (${(amount.paisa / 100).toFixed(2)}).`);
+    }
+  }
+
   const status = input.submitNow ? "SUBMITTED" : "DRAFT";
 
   await db.transaction(async (tx) => {
@@ -338,7 +450,7 @@ export async function createExpense(
                'UNVERIFIED',$25,$26,$27,$28,$29,'LIVE',$30)`,
       [
         id, claimNo, user.id, user.memberId, input.date, dateBs, input.calendar, vendorId, input.vendorName,
-        input.categoryId, input.eventId ?? null, input.departmentId ?? null, input.advanceId ?? null,
+        resolvedCategoryId, input.eventId ?? null, input.departmentId ?? null, input.advanceId ?? null,
         amount.paisa, input.description, input.businessPurpose ?? null, input.fundingSource,
         input.paymentMethod ?? null, reimbursementRequired, needsReceipt, declaration,
         input.invoiceNo ?? null, input.sellerPan ?? null, status, documentationState,
@@ -363,6 +475,13 @@ export async function createExpense(
         );
       }
     }
+    for (const item of items) {
+      await tx.query(
+        `INSERT INTO expense_items (id, claim_id, description, quantity, unit, unit_price_paisa, discount_paisa, tax_paisa, line_total_paisa, category_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [randomUUID(), id, item.description, item.quantity, item.unit, item.unitPricePaisa, item.discountPaisa, item.taxPaisa, item.lineTotalPaisa, item.categoryId],
+      );
+    }
   });
 
   await recordAudit(db, {
@@ -372,6 +491,11 @@ export async function createExpense(
     after: { amount_paisa: amount.paisa, vendor: input.vendorName, status },
     ip: ctx.ip, userAgent: ctx.userAgent,
   });
+
+  if (input.submitNow) {
+    const recipients = await many<{ id: string }>(db, `SELECT id FROM users WHERE role IN ('ADMIN','FINANCE','EXECUTIVE') AND is_active=true`);
+    await notifyClaimSubmittedInApp(db, { id, claim_no: claimNo, amount_paisa: amount.paisa }, recipients.map((r) => r.id));
+  }
 
   return { id, claimNo, status };
 }
@@ -390,17 +514,20 @@ export async function resolveVendor(db: Db, name: string): Promise<string> {
 }
 
 export async function submitClaim(db: Db, user: CurrentUser, claimId: string) {
-  const claim = await one<{ id: string; claimant_user_id: string; status: string; claim_no: string; approved_at: Date | null }>(
-    db, `SELECT id, claimant_user_id, status, claim_no, approved_at FROM expense_claims WHERE id=$1`, [claimId],
+  const claim = await one<{ id: string; claimant_user_id: string; status: string; claim_no: string; approved_at: Date | null; date_ad: string }>(
+    db, `SELECT id, claimant_user_id, status, claim_no, approved_at, to_char(date_ad,'YYYY-MM-DD') AS date_ad
+           FROM expense_claims WHERE id=$1`, [claimId],
   );
   if (!claim) throw new ExpenseError("Claim not found.");
   if (claim.claimant_user_id !== user.id) throw new ExpenseError("Only the claimant can submit this draft.");
   if (claim.status !== "DRAFT") throw new ExpenseError("Only drafts can be submitted.");
+  await assertDateOpen(db, claim.date_ad, "This claim date");
   await db.query(`UPDATE expense_claims SET status='SUBMITTED', submitted_at=now() WHERE id=$1`, [claimId]);
   await recordAudit(db, {
     actorUserId: user.id, actorName: user.name, action: "EXPENSE_SUBMITTED",
     entityType: "expense_claim", entityId: claimId, summary: `${claim.claim_no} submitted for approval`,
   });
+  await notifyClaimEvent(db, claimId, "SUBMITTED", { actorName: user.name });
 }
 
 export async function withdrawClaim(db: Db, user: CurrentUser, claimId: string) {
@@ -429,7 +556,9 @@ export async function decideClaim(
   reason: string | null,
   ctx: { ip?: string | null } = {},
 ) {
-  if (!can(user.role, "expense.approve", user.permissions)) throw new ExpenseError("You cannot approve expenses.");
+  if (!can(user.role, "expense.approve", user.permissions) && !(await hasActiveDelegation(db, user.id))) {
+    throw new ExpenseError("You cannot approve expenses.");
+  }
   const claim = await one<{
     id: string; claim_no: string; claimant_user_id: string; status: string; amount_paisa: number;
     reimbursement_required: boolean; funding_source: string; advance_id: string | null;
@@ -462,6 +591,7 @@ export async function decideClaim(
       entityType: "expense_claim", entityId: claimId,
       summary: `${claim.claim_no} rejected: ${reason}`, ip: ctx.ip,
     });
+    await notifyClaimEvent(db, claimId, "DECISION", { actorName: user.name });
     return { status: "REJECTED" };
   }
 
@@ -475,6 +605,7 @@ export async function decideClaim(
       actorUserId: user.id, actorName: user.name, action: "EXPENSE_CHANGES_REQUESTED",
       entityType: "expense_claim", entityId: claimId, summary: `${claim.claim_no}: changes requested`,
     });
+    await notifyClaimEvent(db, claimId, "DECISION", { actorName: user.name });
     return { status: "UNDER_REVIEW" };
   }
 
@@ -556,6 +687,7 @@ export async function decideClaim(
       : `${claim.claim_no}: approval recorded; additional approval still required`,
     ip: ctx.ip,
   });
+  await notifyClaimEvent(db, claimId, "DECISION", { actorName: user.name });
   return { status: final?.status ?? "UNDER_REVIEW", complete };
 }
 
@@ -569,17 +701,21 @@ export async function recordClaimPayment(
   if (!isValidISODate(input.date)) throw new ExpenseError("Payment date is invalid.");
   const amount = parseMoney(input.amount);
   if (!amount.ok) throw new ExpenseError(amount.error);
+  await assertDateOpen(db, input.date, "This payment date");
 
   const claim = await one<{
     id: string; claim_no: string; amount_paisa: number; status: string; funding_source: string;
-    reimbursement_required: boolean; paid_by_member_id: string; date_ad: string;
+    reimbursement_required: boolean; paid_by_member_id: string; date_ad: string; advance_id: string | null;
   }>(
     db,
     `SELECT id, claim_no, amount_paisa, status, funding_source, reimbursement_required, paid_by_member_id,
-            to_char(date_ad,'YYYY-MM-DD') AS date_ad FROM expense_claims WHERE id=$1`,
+            to_char(date_ad,'YYYY-MM-DD') AS date_ad, advance_id FROM expense_claims WHERE id=$1`,
     [input.claimId],
   );
   if (!claim) throw new ExpenseError("Claim not found.");
+  if (claim.advance_id) {
+    throw new ExpenseError("This claim is settled through a cash advance. Record the advance return or a separate adjustment instead of a second cash payment.");
+  }
   if (!["APPROVED", "PAYMENT_PENDING", "REIMBURSED", "VERIFIED"].includes(claim.status)) {
     throw new ExpenseError("Only approved claims can be paid.");
   }
@@ -591,7 +727,7 @@ export async function recordClaimPayment(
   const paidRow = await one<{ paid: number }>(
     db,
     `SELECT COALESCE(SUM(amount_paisa),0) AS paid FROM payments
-      WHERE claim_id=$1 AND status='RECORDED' AND type IN ('REIMBURSEMENT','EXPENSE_PAYMENT')`,
+      WHERE claim_id=$1 AND status='RECORDED' AND reverses_payment_id IS NULL AND type IN ('REIMBURSEMENT','EXPENSE_PAYMENT')`,
     [claim.id],
   );
   const paid = money(paidRow?.paid);
@@ -608,6 +744,7 @@ export async function recordClaimPayment(
     : "PAYMENT_PENDING";
 
   await db.transaction(async (tx) => {
+    await lockAndAssertFunds(tx, account.id, input.date, amount.paisa, account.name);
     await tx.query(
       `INSERT INTO payments (id, ref, type, direction, claim_id, account_id, counterparty_member_id, amount_paisa,
                              date_ad, method, reference, notes, created_by, status, is_synthetic)
@@ -640,6 +777,7 @@ export async function recordClaimPayment(
     summary: `${claim.claim_no}: ${type === "REIMBURSEMENT" ? "reimbursement" : "payment"} NPR ${(amount.paisa / 100).toFixed(2)} from ${account.name}`,
     after: { paymentId, amount_paisa: amount.paisa, status: nextStatus }, ip: ctx.ip,
   });
+  await notifyClaimEvent(db, claim.id, "PAID", { paymentId, actorName: user.name });
   return { paymentId, status: nextStatus, paid: newPaid };
 }
 
@@ -673,6 +811,7 @@ export async function verifyClaim(db: Db, user: CurrentUser, claimId: string, no
     entityType: "expense_claim", entityId: claimId, summary: `${claim.claim_no} evidence verified`,
     after: { note: note ?? null },
   });
+  await notifyClaimEvent(db, claimId, "VERIFIED", { actorName: user.name });
 }
 
 export async function flagDispute(db: Db, user: CurrentUser, claimId: string, reason: string) {

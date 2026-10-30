@@ -235,7 +235,9 @@ Periods default to the current BS fiscal year. All report money is paisa interna
 
 ---
 
-## 9. Month/period close (manual procedure)
+## 9. Month/period close
+
+**Implemented in `accounting_periods` / `accounting_period_events` (`003_operational_hardening.sql`).**
 
 1. Import the final bank statement and match every line (or mark it ignored with a reason).
 2. Reconcile each account; investigate any difference.
@@ -243,7 +245,14 @@ Periods default to the current BS fiscal year. All report money is paisa interna
 4. Review the trial balance and cashflow for the period.
 5. Export `journal`, `trial-balance`, `cashflow`, `claims`, and `payments` for the record.
 6. Back up the database and documents (`BACKUP_AND_RESTORE.md`).
-7. Do **not** edit prior entries; post corrections in the current period with a memo referencing the original.
+7. Close the period in **Settings → Accounting periods** with a reason. Closing is audited.
+8. After close, `postJournal`, expense creation/submission, and payment recording reject dates inside the closed period.
+9. Reopen only through the authorized, audited action; document the reason. Do **not** edit prior entries.
+10. Corrections to a closed period must be posted in an open period with a memo referencing the original, or the period must be reopened under review.
+
+### Payment corrections
+
+A recorded payment is never edited or deleted. `reversePayment` creates a linked equal-and-opposite payment and journal entry, marks the original `VOID`, recomputes the claim status, and writes an audit event with before/after. Reversal rows are excluded from cashflow and paid/received aggregates. `ADVANCE_*` reversals are intentionally unsupported and must be handled as a documented exception.
 
 ---
 

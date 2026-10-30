@@ -12,7 +12,7 @@
 |---|---|---|
 | `01_EXECUTIVE_SUMMARY.md` … `13_FINAL_RECOMMENDATION.md` | Product research, workflows, Nepal compliance notes, data-model sketch, security guidance, roadmap | **Design intent**, not financial records |
 | `KIMI LOCUS FINACNEArchive.zip` | Original copy of the research material | Same as above; preserved untouched |
-| Sponsor / tier workbook | 8 tier rows totalling **NPR 150,000** | **Incomplete** — no payer names, dates, receipt references, or full ledger |
+| Sponsor / tier workbooks | One summary workbook has 8 tier rows totalling **NPR 150,000**; the wider folder contains 1,000+ row planning/contact sheets across years | **Incomplete** — heterogeneous columns, no payer/date/receipt-level ledger |
 | eSewa statement | A **personal** wallet statement, not a LOCUS organisational account | **PII — must not be imported or exposed** |
 | Everything else | No bank statements, receipts, invoices, or historical ledger for LOCUS | **Absent** |
 
@@ -58,7 +58,7 @@ The specification was delivered as 24 thematic sections. Coverage is summarised 
 
 ## 3. Data-quality findings
 
-1. **Sponsor workbook is not a ledger.** 8 tier rows and NPR 150,000 is a plan, not confirmed income. It must not be presented as received sponsorship.
+1. **Sponsor workbooks are not a ledger.** The tier summary (8 rows, NPR 150,000) and the wider planning/contact sheets are plans, not confirmed income. They must not be presented as received sponsorship, and no safe bulk import exists.
 2. **The eSewa statement is personal.** Holder name and account number are PII. It was read only to design the statement parser; it is not copied into the repo or database.
 3. **No historical receipts exist.** Any “verified” historical claim would be fabricated, so none were created.
 4. **Compliance status is unverified.** `settings.compliance.legalStatus = UNVERIFIED`, PAN empty, VAT false. Tax fields are informational, not obligations.
@@ -88,10 +88,12 @@ The specification was delivered as 24 thematic sections. Coverage is summarised 
 
 ### Verification evidence (2026-10-24)
 - `npx tsc --noEmit` → exit 0.
-- `npm test` → **96/96 tests in 11 files pass**.
-- `npm run build` → exit 0, no build warnings.
-- `npm run test:e2e` → **6/6 Playwright tests pass**.
-- Demo dataset restored after tests: 9 claims, 7 payments, 9 documents, 13 balanced journal entries, 5 matched + 1 open bank line, 51 audit events.
+- `npm test` → **117/117 tests in 15 files pass**.
+- `npm run build` → exit 0, no build warnings; `/mfa-setup` present.
+- `npm run test:e2e` → **6/6 Playwright tests pass**, including against a restored disposable database.
+- Backup → verify → restore → `RESTORED DATABASE VERIFIED`.
+- MFA browser flow (`MFA_E2E_PASS`).
+- Current demo DB: 12 synthetic claims, 10 payments, 9 documents (10 files, 1 orphan), 19 balanced journal entries, 6 bank lines, 69 audit events. E2E added synthetic rows; earlier seed state is in verified backups.
 
 ---
 
@@ -106,7 +108,7 @@ The specification was delivered as 24 thematic sections. Coverage is summarised 
 | Over-receipt of sponsorship hides pledge gaps | Low | Medium | Allowed by design; report shows promised vs received |
 | Cash balance can go negative | Medium | Medium | Visible on accounts page; no hard block (documented) |
 | Single admin lockout | Low | High | ADMIN role matrix is immutable; password reset script |
-| In-memory login rate limit resets on restart | Medium | Low | Acceptable single-process; replace with shared store in production |
+| Login brute force | Medium | High | Durable rate limit + 8-failure/15-minute lockout; alerting still pending |
 | Unencrypted database at rest | Medium | High | Disk encryption + file permissions required; documented |
 
 ---

@@ -3,11 +3,13 @@ import { requireUser } from "@/server/auth";
 import { getDb, one } from "@/server/db";
 import { listDocuments } from "@/server/documents";
 import { ocrCapability } from "@/server/ocr";
+import { malwareScanCapability, malwareScanRequired } from "@/server/malware";
 import { formatTimestamp } from "@/lib/nepali-date";
 import { PageHeader, StatusBadge, EmptyState, SourceTag } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
 import { uploadDocumentAction } from "@/app/actions/documents";
 import { Upload } from "lucide-react";
+import { can } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -24,18 +26,22 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
   const q = pick(sp, "q");
   const status = pick(sp, "status");
 
-  const [documents, summary, capability] = await Promise.all([
-    listDocuments(db, { q, status, limit: 150 }),
+  const [documents, summary, capability, scanCapability] = await Promise.all([
+    listDocuments(db, user, { q, status, limit: 150 }),
     one<{ total: number; review: number; duplicates: number; failed: number; extracted: number }>(
       db,
       `SELECT COUNT(*)::int AS total,
-              COUNT(*) FILTER (WHERE status IN ('NEEDS_REVIEW','EXTRACTED'))::int AS review,
-              COUNT(*) FILTER (WHERE duplicate_of IS NOT NULL)::int AS duplicates,
-              COUNT(*) FILTER (WHERE status='FAILED')::int AS failed,
-              COUNT(*) FILTER (WHERE status IN ('EXTRACTED','REVIEWED'))::int AS extracted
-         FROM documents`,
+              COUNT(*) FILTER (WHERE d.status IN ('NEEDS_REVIEW','EXTRACTED'))::int AS review,
+              COUNT(*) FILTER (WHERE d.duplicate_of IS NOT NULL)::int AS duplicates,
+              COUNT(*) FILTER (WHERE d.status='FAILED')::int AS failed,
+              COUNT(*) FILTER (WHERE d.status IN ('EXTRACTED','REVIEWED'))::int AS extracted
+         FROM documents d
+         LEFT JOIN expense_claims c ON c.id = d.claim_id
+        WHERE ${can(user.role, "document.view.all", user.permissions) ? "TRUE" : "(d.uploaded_by = $1 OR c.claimant_user_id = $1)"}`,
+      can(user.role, "document.view.all", user.permissions) ? [] : [user.id],
     ),
     ocrCapability(),
+    malwareScanCapability(),
   ]);
 
   return (
@@ -90,6 +96,10 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
             <div className="tiny muted">
               OCR engine: {capability.engine} ({capability.available ? capability.languages.join(", ") || "no languages" : "unavailable"}).
               {!capability.nepaliSupported ? " Nepali/Devanagari text extraction is not available in this environment; enter those fields manually." : ""}
+              <br />
+              Malware scan: {scanCapability.available ? `${scanCapability.version} available` : "unavailable"}.
+              {scanCapability.available ? "" : " Files are stored as UNAVAILABLE, never as clean."}
+              {malwareScanRequired() ? " Required policy is ON; unscanned files cannot be processed or downloaded." : ""}
             </div>
           </div>
         </div>
@@ -115,7 +125,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
         <div className="table-wrap">
           {documents.length ? (
             <table className="data">
-              <thead><tr><th>File</th><th>Type</th><th>Claim</th><th>Status</th><th>Review</th><th>Uploaded by</th><th>Size</th><th>Uploaded</th></tr></thead>
+              <thead><tr><th>File</th><th>Type</th><th>Claim</th><th>Status</th><th>Scan</th><th>Review</th><th>Uploaded by</th><th>Size</th><th>Uploaded</th></tr></thead>
               <tbody>
                 {documents.map((doc) => (
                   <tr key={doc.id}>
@@ -126,6 +136,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
                     <td className="muted">{doc.doc_type.replaceAll("_", " ")}</td>
                     <td>{doc.claim_no ? <Link className="link" href={`/expenses/${doc.claim_id}`}>{doc.claim_no}</Link> : <span className="faint">Unattached</span>}</td>
                     <td><StatusBadge status={doc.status} /></td>
+                    <td><StatusBadge status={doc.scan_status} /></td>
                     <td><StatusBadge status={doc.review_status} /></td>
                     <td className="muted">{doc.uploader ?? "—"}</td>
                     <td className="muted">{(Number(doc.size_bytes) / 1024).toFixed(0)} KB</td>

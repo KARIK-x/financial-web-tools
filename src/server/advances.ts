@@ -8,6 +8,7 @@ import { isValidISODate } from "@/lib/nepali-date";
 import type { CurrentUser } from "./auth";
 import { can } from "@/lib/permissions";
 import { ExpenseError, refreshAdvanceStatus } from "./expenses";
+import { lockAndAssertFunds } from "./funds";
 
 export type AdvanceRow = {
   id: string;
@@ -169,6 +170,7 @@ export async function disburseAdvance(
 
   const paymentId = randomUUID();
   await db.transaction(async (tx) => {
+    await lockAndAssertFunds(tx, account.id, input.date, adv.amount_paisa, account.name);
     await tx.query(
       `INSERT INTO payments (id, ref, type, direction, advance_id, account_id, counterparty_member_id, amount_paisa,
                              date_ad, method, reference, created_by, status, is_synthetic)

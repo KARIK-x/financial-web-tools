@@ -8,7 +8,7 @@ import { can } from "@/lib/permissions";
 import { PageHeader, Stat, StatusBadge, ProgressBar, EmptyState } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
 import { BudgetLines } from "@/components/BudgetLines";
-import { createBudgetAction, createEventAction } from "@/app/actions/budgets";
+import { createBudgetAction, createEventAction, reviseBudgetAction } from "@/app/actions/budgets";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export default async function EventsPage() {
   const db = await getDb();
   const manages = can(user.role, "budget.manage", user.permissions);
 
-  const [events, budgets, categories] = await Promise.all([
+  const [events, budgets, categories, revisions] = await Promise.all([
     many<{ id: string; name: string; code: string; starts_on: string | null; ends_on: string | null; status: string; spend: number; claims: number }>(
       db,
       `SELECT e.id, e.name, e.code, to_char(e.starts_on,'YYYY-MM-DD') AS starts_on, to_char(e.ends_on,'YYYY-MM-DD') AS ends_on,
@@ -30,6 +30,12 @@ export default async function EventsPage() {
     ),
     listBudgets(db),
     many<{ id: string; name: string; group_name: string }>(db, `SELECT id, name, group_name FROM expense_categories WHERE is_active ORDER BY sort_order`),
+    many<{ id: string; line_id: string; old_paisa: number; new_paisa: number; reason: string; created_at: Date; actor_name: string | null }>(
+      db,
+      `SELECT r.id, r.budget_line_id AS line_id, r.old_paisa, r.new_paisa, r.reason, r.created_at, u.name AS actor_name
+         FROM budget_revisions r LEFT JOIN users u ON u.id=r.actor_user_id
+        ORDER BY r.created_at DESC LIMIT 20`,
+    ),
   ]);
 
   const nowFy = fiscalYearBsFor(todayISO());
@@ -96,8 +102,40 @@ export default async function EventsPage() {
                       {b.lines.map((l) => <span key={l.id}>{l.category_name}: {formatNPR(l.incurred_paisa)} / {formatNPR(l.amount_paisa)}</span>)}
                     </div>
                   ) : null}
+                  {manages && b.lines.length ? (
+                    <div style={{ marginTop: 10 }}><ActionForm action={reviseBudgetAction} submitLabel="Revise a line" className="grid">
+                      <input type="hidden" name="budgetId" value={b.id} />
+                      <div className="grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                        <div className="field">
+                          <label className="label">Line</label>
+                          <select name="lineId" required>
+                            {b.lines.map((l) => <option key={l.id} value={l.id}>{l.category_name}</option>)}
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label className="label">New amount</label>
+                          <input name="amount" required placeholder="NPR" />
+                        </div>
+                        <div className="field">
+                          <label className="label">Reason</label>
+                          <input name="reason" required placeholder="Why?" />
+                        </div>
+                      </div>
+                    </ActionForm>
+                  </div>
+                  ) : null}
                 </div>
               )) : <div className="tiny muted">No budgets have been set.</div>}
+              {revisions.length ? (
+                <div style={{ marginTop: 12 }}>
+                  <div className="tiny muted" style={{ marginBottom: 6 }}>Recent revisions</div>
+                  {revisions.map((r) => (
+                    <div key={r.id} className="tiny muted" style={{ padding: "4px 0", borderBottom: "1px solid var(--line)" }}>
+                      {r.actor_name ?? "system"} changed a line from {formatNPR(Number(r.old_paisa))} to {formatNPR(Number(r.new_paisa))}: {r.reason}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

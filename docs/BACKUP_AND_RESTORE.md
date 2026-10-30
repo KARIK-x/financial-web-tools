@@ -1,165 +1,252 @@
 # BACKUP AND RESTORE
 
-**Scope:** the PGlite database, the private document store, and the credentials files under `.data/`.
+**Status: IMPLEMENTED / TESTED-PASS (manual/CLI core); NOT-TESTED (scheduled/offsite)**
+**Last verified drill:** 2026-10-24
+**Scope:** the PGlite database, the private document store, and the restore procedure.
 
-A backup is only valid if you have restored it successfully. Schedule a restore rehearsal before real financial data is entered, then quarterly.
+A backup is only valid if it has been restored successfully. This document records the automated scripts and a genuine restore drill, not a theoretical procedure.
 
 ---
 
-## 1. What must be backed up
+## 1. What is backed up
 
-| Path | Contents | Criticality |
+| Path | Contents | Included |
 |---|---|---|
-| `.data/pglite/` | PostgreSQL data directory (all books, users, audit trail) | **Critical** |
-| `.data/documents/` | Receipts, invoices, statements (content-addressed files) | **Critical** |
-| `.data/initial-admin-credentials.txt` | Generated first-admin password (if still present) | Sensitive; delete after first sign-in |
-| `.data/demo-credentials.txt` | Demo password (demo only) | Not for production |
-| `.env` / environment | `DATABASE_DIR`, `DOCUMENT_DIR`, etc. | Needed to reproduce the deployment |
-| `db/migrations/` | Schema history (in git) | Needed for restore/upgrade |
+| `.data/pglite/` | PostgreSQL data directory (books, users, audit trail) | Yes |
+| `.data/documents/` | Receipts, invoices, statements (content-addressed files) | Yes |
+| `SHA256SUMS` | Per-file checksums | Yes |
+| `manifest.json` | Counts, journal totals, document hashes, git commit, timestamp | Yes |
+| `GIT_COMMIT`, `BACKED_UP_AT`, `README.txt` | Provenance | Yes |
+| `.env` / `.data/*credentials.txt` | Passwords, secrets | **No — excluded by design** |
 
 CSV/JSON exports are **not** a substitute for a database backup: they are partial, capped at 20,000 rows, and do not include passwords, sessions, or all metadata.
 
+Credentials and environment files must be restored from a secret manager, not from the backup.
+
 ---
 
-## 2. Backup procedure (consistent copy)
+## 2. Before taking a backup
 
-PGlite is an embedded single-process database. **Stop the application before copying** so the data directory is not changing mid-copy.
+1. **Stop the application.** PGlite is embedded and single-process. Copying a live data directory can produce an inconsistent snapshot.
+2. Confirm no `npm run dev` / `npm start` process is using the same `DATABASE_DIR`.
+3. Decide the destination. Keep it outside the repository (for example `/Users/ashim/locus-backups/...`), on a private volume with restricted permissions.
+
+The scripts warn if the application may still be running, but they cannot guarantee consistency. The operator must stop it.
+
+---
+
+## 3. Create a backup
 
 ```bash
-cd "/path/to/LOCUS FINANCE AUTOMATION"
-
-# 1. Stop the app (systemd example)
-sudo systemctl stop locus-finance
-# or: stop the `npm start` / `npm run dev` process
-
-# 2. Create a timestamped, private backup directory
-STAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP="$HOME/locus-backups/$STAMP"
-mkdir -p "$BACKUP"
-chmod 700 "$HOME/locus-backups" "$BACKUP"
-
-# 3. Copy the database and documents (preserve permissions)
-cp -a .data/pglite "$BACKUP/pglite"
-cp -a .data/documents "$BACKUP/documents"
-
-# 4. Record what was backed up
-( cd .data && find pglite documents -type f -print0 | xargs -0 shasum -a 256 ) > "$BACKUP/SHA256SUMS"
-cp package-lock.json "$BACKUP/"
-git rev-parse HEAD > "$BACKUP/GIT_COMMIT" 2>/dev/null || true
-date -u +"%Y-%m-%dT%H:%M:%SZ" > "$BACKUP/BACKED_UP_AT"
-
-# 5. Restrict access
-chmod -R go-rwx "$BACKUP"
-
-# 6. Restart
-sudo systemctl start locus-finance
+cd "/Users/ashim/Downloads/LOCUS FINANCE AUTOMATION"
+npm run db:backup -- --out /secure/locus-backups/$(date +%Y%m%d-%H%M%S)
 ```
 
-### Notes
-- `cp -a` preserves timestamps and permissions; do not use a tool that follows symlinks unexpectedly.
-- If the app cannot be stopped, a filesystem snapshot (LVM/ZFS/APFS snapshot or VM snapshot) taken atomically is the only safe alternative. A plain `cp` of a live PGlite directory can capture a torn state.
-- Do not back up to the same disk. Use an external/encrypted destination or object storage with server-side encryption.
-- Keep at least 7 daily, 4 weekly, and 12 monthly copies, or per LOCUS policy.
-- Encrypt backups at rest (`age`, GPG, or an encrypted volume). The database is not encrypted by the app.
-
----
-
-## 3. Verify a backup immediately
+Optional paths:
 
 ```bash
-cd "$BACKUP"
-shasum -a 256 -c SHA256SUMS
+npm run db:backup -- \
+  --database-dir .data/pglite \
+  --document-dir .data/documents \
+  --out /secure/locus-backups/20261024
 ```
 
-Then do a **restore test** into a scratch location (§4) at least once per quarter. A checksum match proves the copy is intact, not that PostgreSQL can open it.
+Output includes:
+
+- `database/` — copied PGlite data directory
+- `documents/` — copied content-addressed files
+- `SHA256SUMS` — checksums for every file
+- `manifest.json` — table counts, journal totals, document rows/files, orphan list, git commit
+- `GIT_COMMIT`, `BACKED_UP_AT`, `README.txt`
+
+The backup is private (`0700` directories, `0600` files).
 
 ---
 
-## 4. Restore procedure
-
-> Destructive. Confirm you are restoring the intended snapshot and that the current data is either backed up or disposable.
+## 4. Verify a backup (before relying on it)
 
 ```bash
-cd "/path/to/LOCUS FINANCE AUTOMATION"
-
-# 1. Stop the app
-sudo systemctl stop locus-finance
-
-# 2. Move the current data aside (do not delete yet)
-STAMP=$(date +%Y%m%d-%H%M%S)
-mkdir -p ".data/attic-$STAMP"
-mv .data/pglite ".data/attic-$STAMP/pglite"
-mv .data/documents ".data/attic-$STAMP/documents"
-
-# 3. Copy the backup into place
-cp -a "$BACKUP/pglite" .data/pglite
-cp -a "$BACKUP/documents" .data/documents
-chmod 700 .data .data/pglite .data/documents
-
-# 4. Verify file checksums again
-( cd .data && shasum -a 256 -c "$BACKUP/SHA256SUMS" )
-
-# 5. Start and verify
-sudo systemctl start locus-finance
+npm run db:verify-backup -- --from /secure/locus-backups/20261024
 ```
 
-### Post-restore checks
-1. Sign in as ADMIN.
-2. Open **Overview** — figures render without errors.
-3. Open **Reports → Trial balance** — debits equal credits.
-4. Open **Audit trail** — recent events are present up to the backup time.
-5. Open a known claim and its receipt (document download works).
-6. Run a bank reconciliation view; matched lines are intact.
-7. Confirm no demo data is present in a real workspace.
-8. Only after these checks, remove `.data/attic-*` (it contains sensitive data; delete securely).
+A healthy result:
 
-If the app fails to start, check ownership/permissions and the server log. Do not “repair” the data directory by deleting files; restore the previous snapshot instead.
-
----
-
-## 5. Restoring to a different machine
-
-1. Install the same Node version and run `npm ci`.
-2. Copy `.data/pglite` and `.data/documents` with permissions.
-3. Ensure `DATABASE_DIR`/`DOCUMENT_DIR` point at the restored paths (or use the defaults).
-4. Set `NODE_ENV=production` and HTTPS as before.
-5. Start once; migrations already applied are skipped.
-6. Run the post-restore checks.
-
-Sessions are stored in the database. Restoring an old snapshot revives sessions that were valid at that time; **revoke all sessions** after a restore by running:
-
-```sql
-UPDATE sessions SET revoked_at = now() WHERE revoked_at IS NULL;
+```
+VERIFIED
+  Created: ...
+  Git commit: ...
+  Journal: 19 entries, debit=59575000, credit=59575000
+  Documents: 9 rows, 10 files
 ```
 
-There is no CLI wrapper for this yet; use a one-off `tsx` script or the database console, then sign in again.
+The verifier checks:
+
+- manifest/checksum integrity,
+- required files,
+- journal debit = credit,
+- document row/file consistency,
+- orphan files (warned, preserved, not deleted),
+- count consistency.
+
+`VERIFIED` means the backup is internally consistent. It is **not** proof that a restore works; run the restore drill.
 
 ---
 
-## 6. Point-in-time and partial recovery
+## 5. Restore into a disposable target
 
-- **Accidental claim/payment change:** the audit trail records before/after values. Financial rows are append-only or void-only, so the correct fix is a correction entry, not a restore.
-- **Deleted document:** deletion is blocked by trigger. If a file is missing from disk, restore `documents/` from backup; the database row still points at the content hash.
-- **Corrupted database:** restore the last good snapshot. Any transactions after it are lost unless you have exported them; document the gap in the audit/notes.
-- **Lost admin password:** restore is not required. Use `npm run db:create-admin -- --email=... --name="..." --reset-password` to replace the password and revoke existing sessions.
+Never restore over live data as the first test. Use a scratch directory:
+
+```bash
+SCRATCH=$(mktemp -d /tmp/locus-restore.XXXXXX)
+npm run db:restore -- \
+  --from /secure/locus-backups/20261024 \
+  --database-dir "$SCRATCH/pglite" \
+  --document-dir "$SCRATCH/documents"
+```
+
+The restore:
+
+- refuses a non-empty target unless `--force` is supplied,
+- verifies the backup first,
+- copies the database and documents,
+- sets private permissions,
+- removes a stale `postmaster.pid`,
+- **revokes all sessions in the restored database** so an old cookie cannot revive access,
+- writes `RESTORED_AT`.
+
+Then verify the restored data:
+
+```bash
+npx tsx scripts/verify-restored.ts \
+  --database-dir "$SCRATCH/pglite" \
+  --document-dir "$SCRATCH/documents" \
+  --from /secure/locus-backups/20261024
+```
+
+Expected:
+
+```
+RESTORED DATABASE VERIFIED
+  Claims: ...
+  Documents: ... (... files)
+  Journal: ... entries / ... lines, debit=..., credit=...
+  Audit events: ...
+```
+
+Finally, start the app against the restored paths on a separate port and run a smoke/E2E test:
+
+```bash
+DATABASE_DIR="$SCRATCH/pglite" DOCUMENT_DIR="$SCRATCH/documents" PORT=3400 npm run dev
+E2E_BASE_URL=http://localhost:3400 npm run test:e2e
+```
+
+Do not point the production app at the scratch directory.
 
 ---
 
-## 7. Retention and destruction
+## 6. Verified drill — 2026-10-24
 
-- Backups contain personal data (member names, emails, receipts, bank identifiers). Apply the same access controls as production.
-- Delete expired backups securely (`shred`, encrypted-volume destruction, or provider lifecycle rules).
-- When decommissioning, destroy `.data`, all backups, and credentials files; revoke any external credentials.
+| Step | Result |
+|---|---|
+| Backup created at `/Users/ashim/locus-backups/20261024-160509-final-drill` | **TESTED-PASS** |
+| `npm run db:verify-backup -- --from …` | **`VERIFIED`** |
+| Restore to disposable temp directory | **TESTED-PASS** |
+| `verify-restored.ts` | **`RESTORED DATABASE VERIFIED`** |
+| Restored counts | 12 claims, 9 documents (10 files), 19 journal entries / 39 lines, debit = credit = 59,575,000, 69 audit events |
+| E2E against restored database | **6/6 passed** in 18.2 s |
+| Disposable directory removed | **TESTED-PASS** |
+
+The backup also reported one orphan document file (`18/50/…png`) with no DB row. It was preserved, not deleted, and the verifier warned about it.
 
 ---
 
-## 8. Backup checklist
+## 7. Restore over live data (only after the drill)
 
-- [ ] App stopped or filesystem snapshot taken atomically.
-- [ ] `pglite/` and `documents/` copied together (same point in time).
-- [ ] Checksums generated and verified.
-- [ ] Backup stored off-device and encrypted.
-- [ ] Restore rehearsed into a scratch directory.
-- [ ] Post-restore checks passed (trial balance, audit, document download).
-- [ ] Sessions revoked after restoring an old snapshot.
-- [ ] Retention schedule documented and followed.
+Only when you intentionally replace the live database:
+
+1. Stop the application.
+2. Take a fresh backup of the current live data and verify it.
+3. Restore with `--force` to the live `--database-dir`/`--document-dir`.
+4. Verify the restored data with `verify-restored.ts`.
+5. Start the app, sign in, and check trial balance, recent claims, and a document download.
+6. Keep the pre-restore backup until sign-off.
+
+```bash
+npm run db:restore -- \
+  --from /secure/locus-backups/20261024 \
+  --database-dir .data/pglite \
+  --document-dir .data/documents \
+  --force
+```
+
+**Warning:** `--force` replaces the target. It is destructive. Never use it without a verified pre-restore backup.
+
+---
+
+## 8. What the drill proves — and what it does not
+
+**Proven:**
+- Checksums and manifest match.
+- Database opens and passes journal/count checks.
+- Documents match their SHA-256 rows.
+- Sessions are revoked on restore.
+- The application can start and complete E2E flows against the restored data.
+
+**Not proven:**
+- Managed PostgreSQL point-in-time recovery (no provider).
+- Off-site/encrypted backup storage (not configured).
+- Scheduled backups and retention (not configured).
+- Recovery from a disk failure on the production host.
+- Restore of credentials/secrets (intentionally excluded).
+
+---
+
+## 9. Recommended production policy
+
+1. **Schedule** a daily backup during a maintenance window; stop or quiesce writes.
+2. **Encrypt** the backup at rest and in transit; store off-device.
+3. **Retain** daily/weekly/monthly copies per LOCUS policy.
+4. **Verify** every backup automatically (`db:verify-backup`).
+5. **Drill** a restore quarterly into a disposable environment, with a signed checklist.
+6. **Record** the operator, date, backup path, verification result, and any warnings.
+7. **Never** commit backups, credentials, `.data`, or exports.
+
+---
+
+## 10. Troubleshooting
+
+| Symptom | Likely cause | Action |
+|---|---|---|
+| `Backup target already exists` | Reusing an output directory | Choose a new timestamped directory or remove the scratch target |
+| `Backup verification failed` | Corrupt/missing file or bad manifest | Do not restore; take a new backup from a healthy source |
+| `Target database directory is not empty` | Restore target already has data | Use a fresh scratch directory, or `--force` only when intentional |
+| `PGlite ... already locked` | App still running | Stop the app; do not copy a live directory |
+| `orphan document files` warning | File without DB row | Preserve; investigate; do not auto-delete |
+| `journal not balanced` | Corrupt/failed restore | Do not use; restore an older verified backup |
+| `document hash mismatch` | Corrupt file or wrong document dir | Restore from a verified backup |
+
+---
+
+## 11. Related files
+
+- `scripts/lib/backup.ts` — create/verify/restore implementation
+- `scripts/backup.ts` — CLI
+- `scripts/verify-backup.ts` — CLI
+- `scripts/restore-backup.ts` — CLI
+- `scripts/verify-restored.ts` — restored-data checks
+- `tests/backup-restore.test.ts` — automated test
+- `docs/POSTGRESQL_MIGRATION_PLAN.md` — future provider-level backup/PITR
+
+## Scheduling and retention
+
+A scheduler is not built into the application. Use the operating-system scheduler or your deployment platform:
+
+```bash
+# Daily backup at 02:00
+0 2 * * * cd /path/to/locus-finance && npm run db:backup
+
+# Weekly retention cleanup, keeping 30 days
+0 3 * * 0 cd /path/to/locus-finance && npm run backups:retention -- --days=30 --apply --confirm=DELETE-OLD-BACKUPS
+```
+
+Off-site copies must be encrypted before leaving the host. The backup manifest intentionally excludes credentials and environment files; restore them from the secret manager.

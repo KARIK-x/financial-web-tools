@@ -4,6 +4,56 @@ All notable changes to the LOCUS Finance Intelligence Platform. Dates are AD (IS
 
 ---
 
+## [Unreleased] — 2026-10-24 hardening
+
+Forensic verification and hardening pass. No real LOCUS data was supplied or imported; all financial data remains synthetic.
+
+### Added
+- Migration `003_operational_hardening.sql`: durable `rate_limits`, `accounting_periods`, `accounting_period_events`, MFA columns, OCR page/language columns.
+- TOTP MFA with replay rejection, ten hashed single-use recovery codes, `/mfa-setup`, admin reset, and `MFA_ENFORCE=true` for elevated roles.
+- Durable login rate limiting and persistent 8-failure/15-minute account lockout.
+- Fiscal period close/reopen with audit events and posting guards.
+- Payment reversal/correction workflow (`src/server/corrections.ts`): linked equal-and-opposite payment/journal, original `VOID`, no double counting.
+- Automated backup/verify/restore scripts with manifest, checksums, session revocation, and a disposable restore verifier.
+- `docs/FORENSIC_VERIFICATION.md` and `docs/POSTGRESQL_MIGRATION_PLAN.md`.
+- Tests: financial scenarios A–J, security controls, real English OCR, backup/restore. Suite is now **117 tests / 15 files**.
+- Static CSP on HTML responses.
+- Central `canAccessDocument` and viewer-scoped document/claim summaries.
+- Advance-funded claim guards (amount cap, no cash payment, no personal funding).
+
+### Fixed
+- Document attach/review authorization bypasses.
+- Cross-member and cross-claim receipt attachment.
+- Expense summary totals ignoring filters and member scope.
+- Dead `users.locked_until` field.
+- Missing `/mfa-setup` route (would have broken MFA enforcement).
+- Restored snapshots reviving old sessions.
+- OCR false invoice number from the word `TOTAL`.
+- Claim `paid_paisa` aggregate type normalisation.
+- Orphan document file reporting in backup verification.
+
+### Verified
+- `npx tsc --noEmit` — pass.
+- `npm test` — 117/117.
+- `npm run build` — pass; `/mfa-setup` present.
+- `npm run test:e2e` — 6/6 on the live demo DB and 6/6 against a restored disposable DB.
+- Backup → verify → restore → `RESTORED DATABASE VERIFIED` → E2E.
+- MFA browser flow (`MFA_E2E_PASS`).
+- English OCR via Tesseract 5.5.0.
+- CSP header in a production response.
+
+### Blocked / not implemented
+- Managed PostgreSQL migration: no server/client/credentials. Plan only.
+- Nepali OCR: no `nep` traineddata.
+- Scanned-PDF OCR: no rasteriser.
+- Bulk historical import: source files are heterogeneous; no safe importer.
+- Production email/password reset: no SMTP/provider.
+- Scheduled/offsite encrypted backups: scripts only.
+- Audit hash chain, malware scanning, application-level encryption at rest.
+- Negative-balance and sponsor over-receipt policies remain product decisions.
+
+---
+
 ## [0.1.0] — 2026-10-24
 
 First complete build: a single-organisation finance platform with real persistence, enforced double-entry accounting, RBAC, document custody, reconciliation, reporting, and tests.

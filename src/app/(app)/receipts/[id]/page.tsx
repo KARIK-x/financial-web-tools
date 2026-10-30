@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/server/auth";
-import { getDb, one } from "@/server/db";
-import { getDocument } from "@/server/documents";
+import { getDb } from "@/server/db";
+import { canAccessDocument, getDocument } from "@/server/documents";
 import { can } from "@/lib/permissions";
 import { formatTimestamp } from "@/lib/nepali-date";
 import { formatNPR } from "@/lib/money";
 import { PageHeader, StatusBadge, DefRow, Attention } from "@/components/ui";
 import { ActionForm, QuickAction } from "@/components/ActionForm";
 import { attachDocumentAction, reviewDocumentAction, runOcrAction, saveCorrectionAction } from "@/app/actions/documents";
+import { setDocumentLegalHoldAction } from "@/app/actions/retention";
 import { FileText, ScanLine, ShieldAlert, Check } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -21,16 +22,7 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
   const doc = await getDocument(db, id);
   if (!doc) notFound();
 
-  const access = await one<{ uploaded_by: string | null; claimant: string | null }>(
-    db,
-    `SELECT d.uploaded_by, c.claimant_user_id AS claimant
-       FROM documents d LEFT JOIN expense_claims c ON c.id = d.claim_id WHERE d.id = $1`,
-    [id],
-  );
-  const allowed = can(user.role, "document.view.all", user.permissions)
-    || access?.uploaded_by === user.id
-    || (access?.claimant != null && access.claimant === user.id);
-  if (!allowed) notFound();
+  if (!(await canAccessDocument(db, user, id))) notFound();
 
   const canReview = can(user.role, "document.review", user.permissions);
   const isImage = doc.mime.startsWith("image/");
@@ -48,6 +40,15 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
         actions={<><Link className="btn" href="/receipts">All documents</Link><a className="btn btn-primary" href={`/api/documents/${doc.id}`} target="_blank" rel="noreferrer">Open original</a></>}
       />
 
+      {doc.scan_status === "INFECTED" ? (
+        <div className="warn-box" style={{ marginBottom: 16 }}>
+          <ShieldAlert size={13} style={{ verticalAlign: -2 }} /> This file matched a malware signature and is quarantined. It cannot be downloaded, OCR-processed or attached.
+        </div>
+      ) : doc.scan_status !== "CLEAN" ? (
+        <div className="warn-box" style={{ marginBottom: 16 }}>
+          <ShieldAlert size={13} style={{ verticalAlign: -2 }} /> Malware scan status: <b>{doc.scan_status}</b>. This file is not confirmed clean. {doc.scan_detail ?? ""}
+        </div>
+      ) : null}
       {doc.duplicate_of ? (
         <div className="warn-box" style={{ marginBottom: 16 }}>
           <ShieldAlert size={13} style={{ verticalAlign: -2 }} /> This image looks like an existing document (perceptual hash). Compare them before relying on this copy. Exact byte-identical uploads are blocked; this one is a near-duplicate.
@@ -149,6 +150,10 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
             <div className="card-body">
               <dl className="kv">
                 <DefRow label="Status"><StatusBadge status={doc.status} /></DefRow>
+                <DefRow label="Scan"><StatusBadge status={doc.scan_status} /></DefRow>
+                {doc.scan_engine ? <DefRow label="Scanner">{doc.scan_engine}</DefRow> : null}
+                {doc.scanned_at ? <DefRow label="Scanned">{formatTimestamp(doc.scanned_at)}</DefRow> : null}
+                {doc.scan_detail ? <DefRow label="Scan detail">{doc.scan_detail}</DefRow> : null}
                 <DefRow label="Review"><StatusBadge status={doc.review_status} /></DefRow>
                 <DefRow label="Type">{doc.doc_type}</DefRow>
                 <DefRow label="MIME">{doc.mime}</DefRow>
@@ -187,6 +192,29 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
               </div>
             </div>
           )}
+
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="card-head"><div className="section-title">Retention and legal hold</div></div>
+            <div className="card-body">
+              <dl className="kv" style={{ marginBottom: 12 }}>
+                <DefRow label="Legal hold">{doc.legal_hold ? "Yes" : "No"}</DefRow>
+                {doc.legal_hold_reason ? <DefRow label="Reason">{doc.legal_hold_reason}</DefRow> : null}
+                {doc.retention_until ? <DefRow label="Retention until">{doc.retention_until.toISOString().slice(0,10)}</DefRow> : null}
+                {doc.retention_policy ? <DefRow label="Policy">{doc.retention_policy}</DefRow> : null}
+              </dl>
+              <ActionForm action={setDocumentLegalHoldAction} submitLabel={doc.legal_hold ? "Release hold" : "Set hold"} hideStatus>
+                <input type="hidden" name="documentId" value={doc.id} />
+                <input type="hidden" name="hold" value={doc.legal_hold ? "off" : "on"} />
+                {!doc.legal_hold ? (
+                  <>
+                    <div className="field"><label className="label">Reason</label><input name="reason" required placeholder="Litigation, audit, retention policy" /></div>
+                    <div className="field"><label className="label">Retention until</label><input name="retentionUntil" type="date" /></div>
+                    <div className="field"><label className="label">Policy</label><input name="policy" placeholder="7-year financial records" /></div>
+                  </>
+                ) : null}
+              </ActionForm>
+            </div>
+          </div>
 
           <div className="card">
             <div className="card-head"><div className="section-title">Privacy</div></div>

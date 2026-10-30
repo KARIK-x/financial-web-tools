@@ -63,7 +63,7 @@ export async function getDashboard(db: Db, period: Period) {
       COALESCE(SUM(c.amount_paisa) FILTER (WHERE c.status IN ('SUBMITTED','UNDER_REVIEW')),0) AS pending_paisa,
       COUNT(*) FILTER (WHERE c.status IN ('SUBMITTED','UNDER_REVIEW'))::int AS pending_count,
       COALESCE(SUM(GREATEST(0, c.amount_paisa - COALESCE((SELECT SUM(p.amount_paisa) FROM payments p
-        WHERE p.claim_id=c.id AND p.status='RECORDED' AND p.type IN ('REIMBURSEMENT','EXPENSE_PAYMENT')),0)))
+        WHERE p.claim_id=c.id AND p.status='RECORDED' AND p.reverses_payment_id IS NULL AND p.type IN ('REIMBURSEMENT','EXPENSE_PAYMENT')),0)))
         FILTER (WHERE c.reimbursement_required=true AND c.status IN ('APPROVED','PAYMENT_PENDING','VERIFIED')),0) AS reimbursement_owed_paisa,
       COUNT(*) FILTER (WHERE c.reimbursement_required=true AND c.status IN ('APPROVED','PAYMENT_PENDING','VERIFIED'))::int AS reimbursement_owed_count,
       COALESCE(SUM(c.amount_paisa) FILTER (WHERE c.verification_state='DISPUTED'),0) AS disputed_paisa,
@@ -216,7 +216,7 @@ export async function cashflow(db: Db, period: Period) {
   const rows = await many<{ month: string; type: string; direction: string; amount_paisa: number }>(
     db,
     `SELECT to_char(date_trunc('month', date_ad),'YYYY-MM') AS month, type, direction, SUM(amount_paisa) AS amount_paisa
-       FROM payments WHERE status='RECORDED' AND type <> 'TRANSFER' AND date_ad BETWEEN $1 AND $2
+       FROM payments WHERE status='RECORDED' AND reverses_payment_id IS NULL AND type <> 'TRANSFER' AND date_ad BETWEEN $1 AND $2
       GROUP BY 1,2,3 ORDER BY 1`,
     [period.from, period.to],
   );
@@ -283,8 +283,8 @@ export async function sponsorReport(db: Db) {
   }>(
     db,
     `SELECT a.ref, s.name AS sponsor, a.state, a.promised_paisa,
-            COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.agreement_id=a.id AND p.type='SPONSOR_RECEIPT' AND p.status='RECORDED'),0) AS received_paisa,
-            GREATEST(0, a.promised_paisa - COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.agreement_id=a.id AND p.type='SPONSOR_RECEIPT' AND p.status='RECORDED'),0)) AS outstanding_paisa,
+            COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.agreement_id=a.id AND p.type='SPONSOR_RECEIPT' AND p.status='RECORDED' AND p.reverses_payment_id IS NULL),0) AS received_paisa,
+            GREATEST(0, a.promised_paisa - COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.agreement_id=a.id AND p.type='SPONSOR_RECEIPT' AND p.status='RECORDED' AND p.reverses_payment_id IS NULL),0)) AS outstanding_paisa,
             a.in_kind, e.name AS event_name,
             (SELECT COUNT(*)::int FROM sponsor_deliverables d WHERE d.agreement_id=a.id AND d.status='PENDING') AS deliverables_pending
        FROM sponsorship_agreements a JOIN sponsors s ON s.id=a.sponsor_id

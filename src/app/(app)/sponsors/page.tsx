@@ -35,12 +35,18 @@ export default async function SponsorsPage() {
         <Stat label="Committed" value={formatNPRShort(summary.committed)} foot="Cash agreements past negotiation" tone="accent" />
         <Stat label="Received" value={formatNPRShort(summary.received)} foot="Recorded receipts only" />
         <Stat label="Outstanding" value={formatNPRShort(summary.outstanding)} foot="Promised but not received" tone={summary.outstanding > 0 ? "warn" : undefined} />
-        <Stat label="Pipeline / in-kind" value={`${summary.pipelineCount} / ${summary.inKindCount}`} foot="Leads, proposals and non-cash support" />
+        <Stat label="Pipeline / in-kind" value={`${summary.pipelineCount} / ${summary.inKindCount}`} foot={summary.overReceived > 0 ? `${formatNPRShort(summary.overReceived)} over-received — review` : "Leads, proposals and non-cash support"} tone={summary.overReceived > 0 ? "warn" : undefined} />
       </section>
 
       <div className="grid" style={{ gridTemplateColumns: "minmax(0,1.7fr) minmax(0,1fr)" }}>
         <div className="card">
           <div className="card-head"><div className="section-title">Agreements</div><span className="tiny muted">Newest first</span></div>
+          {summary.overReceived > 0 ? (
+            <div className="warn-box" style={{ margin: 16 }}>
+              <b>Over-receipt review required.</b> Recorded receipts exceed the cash promised on at least one agreement by {formatNPR(summary.overReceived)}.
+              Check whether this is an additional commitment, a correction, or a receipt attributed to the wrong agreement before treating it as ordinary income.
+            </div>
+          ) : null}
           <div className="table-wrap">
             {agreements.length ? (
               <table className="data">
@@ -53,7 +59,7 @@ export default async function SponsorsPage() {
                       <td className="muted">{a.event_name ?? "—"}</td>
                       <td><StatusBadge status={a.state} />{a.in_kind ? <div className="row-sub">In-kind</div> : null}</td>
                       <td className="right mono">{a.in_kind ? "—" : formatNPR(Number(a.promised_paisa))}</td>
-                      <td className="right mono">{formatNPR(Number(a.received_paisa))}</td>
+                      <td className="right mono">{formatNPR(Number(a.received_paisa))}{a.over_received_paisa > 0 ? <div className="row-sub" style={{ color: "var(--amber)" }}>over {formatNPR(Number(a.over_received_paisa))}</div> : null}</td>
                       <td className="right mono">{a.in_kind ? "—" : formatNPR(Number(a.outstanding_paisa))}</td>
                       <td>{a.pending_deliverables ? <span className="badge badge-amber">{a.pending_deliverables} pending</span> : <span className="tiny muted">—</span>}</td>
                     </tr>

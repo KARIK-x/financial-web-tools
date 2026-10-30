@@ -4,12 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, CalendarDays, CheckCircle2, ClipboardList, FolderOpen, Handshake, History,
+  BarChart3, Bell, CalendarDays, CheckCircle2, ClipboardList, FolderOpen, Handshake, History,
   KeyRound, Landmark, LayoutDashboard, LogOut, Menu, Receipt, Scale, Settings, Store, TrendingUp,
   Upload, Users, Wallet, X,
 } from "lucide-react";
 import type { Permission } from "@/lib/permissions";
 import { logoutAction } from "@/app/actions/auth";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Item = { href: string; label: string; icon: React.ElementType; permission?: Permission; count?: number };
 
@@ -66,6 +67,7 @@ export function Sidebar({
         { href: "/reconstruction", label: "Reconstruction", icon: History, permission: "report.view" },
         { href: "/audit", label: "Audit trail", icon: History, permission: "audit.view" },
         { href: "/import-export", label: "Import & export", icon: Upload, permission: "import.run" },
+        { href: "/notifications", label: "Notifications", icon: Bell },
         { href: "/settings", label: "Settings", icon: Settings, permission: "settings.manage" },
       ],
     },
@@ -74,7 +76,7 @@ export function Sidebar({
   const initials = user.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
   const nav = (
-    <nav className="nav">
+    <nav className="nav" aria-label="Primary navigation">
       {groups.map((group) => {
         const items = group.items.filter((i) => allows(i.permission));
         if (!items.length) return null;
@@ -85,7 +87,7 @@ export function Sidebar({
               const active = pathname === item.href || (item.href !== "/overview" && pathname.startsWith(`${item.href}/`));
               const Icon = item.icon;
               return (
-                <Link key={item.href} href={item.href} className={`nav-link${active ? " active" : ""}`} onClick={() => setOpen(false)}>
+                <Link key={item.href} href={item.href} className={`nav-link${active ? " active" : ""}`} aria-current={active ? "page" : undefined} onClick={() => setOpen(false)}>
                   <Icon />
                   <span>{item.label}</span>
                   {item.count ? <span className="nav-count">{item.count}</span> : null}
@@ -101,7 +103,7 @@ export function Sidebar({
   return (
     <>
       <div className="topbar no-print">
-        <button className="btn btn-ghost btn-icon" onClick={() => setOpen(true)} aria-label="Open navigation">
+        <button className="btn btn-ghost btn-icon" onClick={() => setOpen(true)} aria-label="Open navigation" aria-expanded={open} aria-controls="primary-navigation">
           <Menu size={18} />
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
@@ -110,7 +112,7 @@ export function Sidebar({
         </div>
       </div>
       {open ? <div className="scrim no-print" onClick={() => setOpen(false)} /> : null}
-      <aside className={`sidebar no-print${open ? " open" : ""}`}>
+      <aside id="primary-navigation" className={`sidebar no-print${open ? " open" : ""}`}>
         <div className="sidebar-brand">
           <span className="brand-mark">L</span>
           <div style={{ flex: 1 }}>
@@ -137,6 +139,9 @@ export function Sidebar({
           >
             <KeyRound size={12} /> Change password
           </Link>
+          <div style={{ marginBottom: 10 }}>
+            <ThemeToggle />
+          </div>
           <form action={logoutAction}>
             <button type="submit">
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>

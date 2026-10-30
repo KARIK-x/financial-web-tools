@@ -26,6 +26,7 @@ export type AgreementRow = {
   invoiced_paisa: number;
   received_paisa: number;
   outstanding_paisa: number;
+  over_received_paisa: number;
   in_kind: boolean;
   in_kind_value_paisa: number | null;
   in_kind_description: string | null;
@@ -49,8 +50,9 @@ export async function listAgreements(db: Db, filters: { state?: string; sponsorI
             a.promised_paisa, a.invoiced_paisa, a.in_kind, a.in_kind_value_paisa, a.in_kind_description,
             a.event_id, e.name AS event_name, a.earmark_note, to_char(a.signed_on,'YYYY-MM-DD') AS signed_on,
             a.is_synthetic,
-            COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.agreement_id=a.id AND p.type='SPONSOR_RECEIPT' AND p.status='RECORDED'),0) AS received_paisa,
-            GREATEST(0, a.promised_paisa - COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.agreement_id=a.id AND p.type='SPONSOR_RECEIPT' AND p.status='RECORDED'),0)) AS outstanding_paisa,
+            COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.agreement_id=a.id AND p.type='SPONSOR_RECEIPT' AND p.status='RECORDED' AND p.reverses_payment_id IS NULL),0) AS received_paisa,
+            GREATEST(0, a.promised_paisa - COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.agreement_id=a.id AND p.type='SPONSOR_RECEIPT' AND p.status='RECORDED' AND p.reverses_payment_id IS NULL),0)) AS outstanding_paisa,
+            GREATEST(0, COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.agreement_id=a.id AND p.type='SPONSOR_RECEIPT' AND p.status='RECORDED' AND p.reverses_payment_id IS NULL),0) - a.promised_paisa) AS over_received_paisa,
             (SELECT COUNT(*)::int FROM sponsor_deliverables d WHERE d.agreement_id=a.id AND d.status='PENDING') AS pending_deliverables
        FROM sponsorship_agreements a JOIN sponsors s ON s.id=a.sponsor_id
        LEFT JOIN events e ON e.id=a.event_id
@@ -192,7 +194,7 @@ export async function recordSponsorReceipt(
     });
     const receivedRow = await tx.query<{ received: number }>(
       `SELECT COALESCE(SUM(amount_paisa),0) AS received FROM payments
-        WHERE agreement_id=$1 AND type='SPONSOR_RECEIPT' AND status='RECORDED'`,
+        WHERE agreement_id=$1 AND type='SPONSOR_RECEIPT' AND status='RECORDED' AND reverses_payment_id IS NULL`,
       [agreement.id],
     );
     const received = money(receivedRow.rows[0]?.received);
@@ -207,6 +209,21 @@ export async function recordSponsorReceipt(
     summary: `${agreement.ref}: NPR ${(amount.paisa / 100).toFixed(2)} received from ${agreement.sponsor_name}`,
     after: { amount_paisa: amount.paisa },
   });
+  const receivedAfter = await one<{ received: number }>(
+    db,
+    `SELECT COALESCE(SUM(amount_paisa),0) AS received FROM payments
+      WHERE agreement_id=$1 AND type='SPONSOR_RECEIPT' AND status='RECORDED' AND reverses_payment_id IS NULL`,
+    [agreement.id],
+  );
+  const over = Math.max(0, money(receivedAfter?.received) - agreement.promised_paisa);
+  if (over > 0) {
+    await recordAudit(db, {
+      actorUserId: user.id, actorName: user.name, action: "SPONSOR_OVER_RECEIPT_REVIEW_REQUIRED",
+      entityType: "sponsorship_agreement", entityId: agreement.id,
+      summary: `${agreement.ref}: receipts exceed the promise by NPR ${(over / 100).toFixed(2)}; review the agreement or receipt attribution.`,
+      after: { over_received_paisa: over, promised_paisa: agreement.promised_paisa },
+    });
+  }
   return { paymentId, ref };
 }
 
@@ -225,15 +242,17 @@ export async function updateAgreementState(db: Db, user: CurrentUser, agreementI
 
 export async function sponsorshipSummary(db: Db) {
   const row = await one<{
-    committed_paisa: number; received_paisa: number; outstanding_paisa: number; in_kind_count: number;
-    pipeline_count: number; active_count: number;
+    committed_paisa: number; received_paisa: number; outstanding_paisa: number; over_received_paisa: number;
+    in_kind_count: number; pipeline_count: number; active_count: number;
   }>(
     db,
     `SELECT
        COALESCE(SUM(CASE WHEN in_kind=false AND state NOT IN ('LEAD','PROPOSED','NEGOTIATING','DECLINED') THEN promised_paisa ELSE 0 END),0) AS committed_paisa,
-       COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.type='SPONSOR_RECEIPT' AND p.status='RECORDED'),0) AS received_paisa,
+       COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.type='SPONSOR_RECEIPT' AND p.status='RECORDED' AND p.reverses_payment_id IS NULL),0) AS received_paisa,
        COALESCE(SUM(CASE WHEN in_kind=false AND state NOT IN ('LEAD','PROPOSED','NEGOTIATING','DECLINED') THEN promised_paisa ELSE 0 END),0)
-         - COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.type='SPONSOR_RECEIPT' AND p.status='RECORDED'),0) AS outstanding_paisa,
+         - COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.type='SPONSOR_RECEIPT' AND p.status='RECORDED' AND p.reverses_payment_id IS NULL),0) AS outstanding_paisa,
+       GREATEST(0, COALESCE((SELECT SUM(p.amount_paisa) FROM payments p WHERE p.type='SPONSOR_RECEIPT' AND p.status='RECORDED' AND p.reverses_payment_id IS NULL),0)
+         - COALESCE(SUM(CASE WHEN in_kind=false AND state NOT IN ('LEAD','PROPOSED','NEGOTIATING','DECLINED') THEN promised_paisa ELSE 0 END),0)) AS over_received_paisa,
        COUNT(*) FILTER (WHERE in_kind)::int AS in_kind_count,
        COUNT(*) FILTER (WHERE state IN ('LEAD','PROPOSED','NEGOTIATING'))::int AS pipeline_count,
        COUNT(*) FILTER (WHERE state IN ('COMMITTED','INVOICED','PARTIALLY_RECEIVED','RECEIVED','DELIVERABLES_PENDING'))::int AS active_count
@@ -243,6 +262,7 @@ export async function sponsorshipSummary(db: Db) {
     committed: money(row?.committed_paisa),
     received: money(row?.received_paisa),
     outstanding: Math.max(0, money(row?.outstanding_paisa)),
+    overReceived: Math.max(0, money(row?.over_received_paisa)),
     inKindCount: row?.in_kind_count ?? 0,
     pipelineCount: row?.pipeline_count ?? 0,
     activeCount: row?.active_count ?? 0,

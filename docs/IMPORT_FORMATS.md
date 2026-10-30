@@ -16,6 +16,15 @@
 
 There is deliberately **no generic spreadsheet importer**. Guessing column meanings for financial history is unsafe; the only bulk importer is the constrained statement parser described below.
 
+### Source-file inspection (2026-10-24)
+
+The historical sponsor files supplied outside the repository were inspected read-only. They are not a stable ledger:
+
+- `Sponsorships of LOCUS 2021.xlsx` — 1,005 rows, 26 columns; mixed company/contact/status/amount free text across years.
+- Other sponsor workbooks/proposals in the same folder — heterogeneous columns, merged cells, planning notes, no receipt-level schema.
+
+A bulk import of these files would require a human-approved column mapping, a dry-run diff, provenance, and per-row validation. That importer does not exist. The files were **not** modified or imported, and no historical cash total is asserted.
+
 ---
 
 ## 2. Bank statement import
@@ -103,11 +112,11 @@ The `occurrence` counter distinguishes two genuinely identical lines on the same
 | Download | `/api/documents/[id]` with authorisation; `Content-Disposition: attachment` |
 
 ### OCR
-- Images: Tesseract (`eng`, `osd`, `snum` installed on this machine).
-- PDFs: embedded text layer via `pdfjs-dist`.
+- Images: Tesseract (`eng`, `osd`, `snum` installed on this machine). **TESTED-PASS** on a generated English receipt: Tesseract 5.5.0 extracted `TOTAL NPR 5,000.00`, date `2026-10-20`, total 500,000 paisa. The `TOTAL` false-positive invoice-number regression is covered by `tests/ocr.test.ts`.
+- PDFs: embedded text layer via `pdfjs-dist`. **IMPLEMENTED**, no synthetic PDF fixture in the final suite.
 - Output: candidate merchant, date, total, tax, invoice number, seller PAN, with per-field confidence and raw text. Stored in `ocr_extractions`; the document moves to `EXTRACTED` or `NEEDS_REVIEW`.
 - A human must accept/correct fields; OCR never writes a claim or a journal.
-- **Nepali (`nep`) traineddata is not installed**, and scanned PDFs cannot be rasterised on this machine (no `pdftotext`/rasteriser). See `KNOWN_BUGS.md`.
+- **Nepali (`nep`) traineddata is not installed** (**BLOCKED**), and scanned PDFs cannot be rasterised on this machine (no `pdftotext`/rasteriser) (**BLOCKED**). See `KNOWN_BUGS.md`.
 
 ---
 

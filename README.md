@@ -31,7 +31,7 @@ Sign in with the generated password (written to `.data/initial-admin-credentials
 
 ```bash
 npx tsc --noEmit
-npm test          # 96 unit/integration tests
+npm test          # 117 unit/integration tests
 npm run build
 npm run test:e2e  # 6 browser tests; needs demo data + Chrome
 ```
@@ -54,6 +54,8 @@ npm run test:e2e  # 6 browser tests; needs demo data + Chrome
 | `docs/DEPLOYMENT_GUIDE.md` | Setup, environment, production notes |
 | `docs/BACKUP_AND_RESTORE.md` | Backup and restore runbook |
 | `docs/SESSION_HANDOFF.md` | State, gotchas, next task |
+| `docs/FORENSIC_VERIFICATION.md` | Evidence-based verification and defect log |
+| `docs/POSTGRESQL_MIGRATION_PLAN.md` | Managed PostgreSQL migration plan (execution blocked) |
 
 ## Stack
 
@@ -65,7 +67,9 @@ Next.js 16 · React 19 · TypeScript 5.9 (strict) · Tailwind 4 · PGlite (embed
 - **NPR only**, single organisation.
 - **Nepali OCR and scanned-PDF OCR are not available** on this machine; manual entry is supported.
 - **No email/notifications**; password resets are admin/CLI-driven.
-- Back up `.data/pglite` and `.data/documents` together, with the app stopped. See `docs/BACKUP_AND_RESTORE.md`.
+- **MFA is available but not enforced by default**; set `MFA_ENFORCE=true` in production.
+- **No managed PostgreSQL yet**; the PGlite deployment is single-process. See `docs/POSTGRESQL_MIGRATION_PLAN.md`.
+- Back up `.data/pglite` and `.data/documents` together with the tested scripts, with the app stopped. See `docs/BACKUP_AND_RESTORE.md`.
 
 ## License / ownership
 

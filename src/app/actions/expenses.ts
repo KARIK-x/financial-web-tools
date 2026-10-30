@@ -55,6 +55,26 @@ export async function createExpenseAction(_prev: ActionResult, fd: FormData): Pr
         businessPurpose: optional(fd, "businessPurpose"),
         amount: str(fd, "amount"),
         categoryId: str(fd, "categoryId"),
+        items: (() => {
+          const descs = fd.getAll("itemDescription").map((v) => String(v).trim()).filter(Boolean);
+          const qtys = fd.getAll("itemQty").map((v) => String(v));
+          const units = fd.getAll("itemUnit").map((v) => String(v));
+          const prices = fd.getAll("itemUnitPrice").map((v) => String(v));
+          const discounts = fd.getAll("itemDiscount").map((v) => String(v));
+          const taxes = fd.getAll("itemTax").map((v) => String(v));
+          const out: Array<{ description: string; quantity: string; unit?: string | null; unitPrice: string; discount?: string | null; tax?: string | null }> = [];
+          for (let i = 0; i < descs.length; i++) {
+            out.push({
+              description: descs[i]!,
+              quantity: qtys[i] || "1",
+              unit: units[i] || null,
+              unitPrice: prices[i] || "0",
+              discount: discounts[i] || null,
+              tax: taxes[i] || null,
+            });
+          }
+          return out.length ? out : undefined;
+        })(),
         eventId: optional(fd, "eventId"),
         departmentId: optional(fd, "departmentId"),
         fundingSource: (str(fd, "fundingSource") || "PERSONAL") as "PERSONAL" | "LOCUS_CASH" | "LOCUS_BANK",

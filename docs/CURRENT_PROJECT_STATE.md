@@ -2,15 +2,15 @@
 
 **As of:** 2026-10-24
 **Location:** `/Users/ashim/Downloads/LOCUS FINANCE AUTOMATION`
-**Stage:** feature-complete single-organisation application; production hardening pending.
+**Stage:** feature-complete single-organisation application; production hardening partially complete; managed PostgreSQL still blocked.
 
 ---
 
 ## 1. Summary
 
-The LOCUS Finance Intelligence Platform is a working Next.js application backed by a real PostgreSQL-compatible database. It implements expense claims, approvals, payments, advances, sponsorships, budgets, documents/OCR review, bank statement reconciliation, double-entry accounting, reports, exports, RBAC, and an append-only audit trail.
+The LOCUS Finance Intelligence Platform is a working Next.js application backed by a real PostgreSQL-compatible database (PGlite). It implements expense claims, approvals, payments, advances, sponsorships, budgets, documents/OCR review, bank statement reconciliation, double-entry accounting, reports, exports, RBAC, MFA, period locks, durable rate limiting, and an append-only audit trail.
 
-It is **not** a reconstruction of LOCUS’s historical books. The supplied materials contained no usable organisational ledger; the app therefore starts empty and ships a synthetic demo dataset for evaluation.
+It is **not** a reconstruction of LOCUS’s historical books. The supplied materials contained no usable organisational ledger; all current financial rows are synthetic and marked as such.
 
 ---
 
@@ -18,26 +18,30 @@ It is **not** a reconstruction of LOCUS’s historical books. The supplied mater
 
 | Check | Command | Result |
 |---|---|---|
-| TypeScript | `npx tsc --noEmit` | **Pass** (exit 0) |
-| Unit/integration | `npm test` | **96/96 pass**, 11 files, ~14 s |
-| Production build | `npm run build` | **Pass** (exit 0, no warnings) |
-| Browser E2E | `npm run test:e2e` | **6/6 pass**, ~20 s |
-| Demo reset | `npm run db:reset-demo` | Pass (synthetic only) |
-| Demo seed | `npm run db:seed-demo` | Pass |
+| TypeScript | `npx tsc --noEmit` | **TESTED-PASS**, exit 0 |
+| Unit/integration | `npm test` | **TESTED-PASS**, 117/117, 15 files, ~20 s |
+| Production build | `npm run build` | **TESTED-PASS**, exit 0; `/mfa-setup` included |
+| Browser E2E | `npm run test:e2e` | **TESTED-PASS**, 6/6, ~21 s |
+| E2E against restored DB | `E2E_BASE_URL=… npm run test:e2e` | **TESTED-PASS**, 6/6 |
+| Backup verify | `npm run db:verify-backup -- --from …` | **TESTED-PASS**, `VERIFIED` |
+| Restore drill | `npm run db:restore …` + `verify-restored.ts` | **TESTED-PASS**, `RESTORED DATABASE VERIFIED` |
+| MFA browser flow | disposable DB, `MFA_ENFORCE=true` | **TESTED-PASS**, enrollment + TOTP + recovery |
+| CSP header | production `npm start` + `curl` | **TESTED-PASS**, enforced |
+| Managed PostgreSQL | — | **BLOCKED**, no server/client/credentials |
 
-The demo database was reset and reseeded **after** the last E2E run, so it is pristine.
+The demo database was **not** reset after the final E2E runs. It contains the seed data plus the synthetic claims/payments created by E2E. That is intentional; the verified backups preserve the earlier states.
 
 ---
 
-## 3. Demo dataset (synthetic)
+## 3. Current database (synthetic)
 
 | Entity | Count |
 |---|---|
 | Users / members | 6 / 6 |
-| Expense claims | 9 |
-| Payments | 7 |
-| Documents | 9 |
-| Journal entries / lines | 13 / 27 (balanced, 58,855,000 paisa each side) |
+| Expense claims | 12 (12 synthetic) |
+| Payments | 10 |
+| Documents | 9 (10 files; 1 orphan preserved) |
+| Journal entries / lines | 19 / 39 (balanced, 59,575,000 paisa each side) |
 | Bank statement lines | 6 (5 matched, 1 open) |
 | Statement imports / reconciliations | 1 / 1 |
 | Budgets / lines | 1 / 9 |
@@ -45,7 +49,11 @@ The demo database was reset and reseeded **after** the last E2E run, so it is pr
 | Sponsors / agreements / deliverables | 3 / 3 / 5 |
 | Vendors / events / departments | 9 / 2 / 2 |
 | Expense categories | 12 |
-| Audit events | 51 |
+| Audit events | 69 |
+| Accounting periods closed | 0 |
+| Non-synthetic financial rows | **0** |
+
+Migrations: `001_init.sql`, `002_reference.sql`, `003_operational_hardening.sql`. Public tables: **39**.
 
 Demo users: `admin@`, `finance@`, `executive@`, `events@`, `member@`, `auditor@` `locus.demo`. The shared password is in `.data/demo-credentials.txt` (mode 0600). It is never printed.
 
@@ -59,20 +67,29 @@ Demo users: `admin@`, `finance@`, `executive@`, `events@`, `member@`, `auditor@`
 - Denied page loads go to `/no-access`; denied actions return a form error.
 - Admin-issued/reset passwords force a password change; changing it revokes other sessions.
 - Role matrix editing (ADMIN row locked to prevent lockout).
+- **MFA**: TOTP enrollment at `/mfa-setup`, replay rejection, ten hashed single-use recovery codes, admin reset with session revocation. `MFA_ENFORCE=true` enforces enrollment for ADMIN/FINANCE/EXECUTIVE; default is off for the synthetic demo.
+- **Durable rate limiting**: `rate_limits` table, survives restart; 12 attempts / 15 minutes per email+IP.
+- **Persistent lockout**: 8 failed sign-ins in 15 minutes sets `users.locked_until`.
+- **Fiscal period close/reopen**: `accounting_periods`, audited close/reopen; journal, expense, and payment posting guard.
 - Append-only audit trail with actor, entity, before/after, IP, user agent.
+- **CSP** on HTML responses; document responses retain a sandbox CSP.
 
 ### Spend
 - Create claims with allocations across event/department, vendor, category, BS/AD date.
 - Missing-receipt declaration workflow.
 - Tiered approvals, self-approval blocked, committee reference, second approval.
 - Partial payments, over-payment blocked, status transitions.
+- **Payment corrections** by linked equal-and-opposite reversal; original marked VOID; no deletion.
 - Verification and dispute handling.
 - Reimbursement vs organisation-funded vs advance-funded accounting.
+- Advance-funded claim guards: cannot exceed outstanding advance; cannot be paid in cash; personal funding with an advance rejected.
 
 ### Documents
 - Private upload, SHA-256 dedupe, perceptual near-duplicate flag.
+- Central `canAccessDocument`; members only see their own uploads/claims, finance/admin see all.
 - Authorised streaming download; immutable originals.
-- OCR candidate extraction with human review (English/text PDFs only).
+- OCR candidate extraction with human review (English images and text-layer PDFs only).
+- Document attach/review authorization hardened; closed claims and cross-claim reattachment rejected.
 
 ### Money
 - Cash/bank/wallet accounts, transfers, opening balances.
@@ -84,13 +101,19 @@ Demo users: `admin@`, `finance@`, `executive@`, `events@`, `member@`, `auditor@`
 ### Reporting
 - Dashboard, category/event spend, cashflow, trial balance, budget, sponsor, documentation, monthly spend.
 - 13 export datasets in CSV/JSON, formula-injection guarded, audited, capped at 20,000 rows.
+- Reversal payments excluded from cashflow/paid aggregates to avoid double counting.
+
+### Operations
+- Checksummed backup with manifest, database, documents, git commit, and restore verification.
+- Restore into a disposable target; sessions revoked by default.
+- Verified final drill: backup → verify → restore → verify → E2E 6/6.
 
 ---
 
 ## 5. Pages
 
 ```
-/login  /setup  /change-password
+/login  /setup  /change-password  /mfa-setup
 /overview  /my-expenses  /expenses  /expenses/new  /expenses/[id]
 /approvals  /receipts  /receipts/[id]
 /advances  /advances/[id]  /sponsors  /sponsors/[id]
@@ -127,19 +150,24 @@ Demo users: `admin@`, `finance@`, `executive@`, `events@`, `member@`, `auditor@`
 | `.data/demo-credentials.txt` | Demo password (0600) | ignored |
 | `.data/initial-admin-credentials.txt` | First-admin password, if generated | ignored |
 | `db/migrations` | Schema history | committed |
-| `docs/` | This documentation | committed |
+| `docs/` | Documentation | committed |
+| `/Users/ashim/locus-backups/*` | Verified local backups | outside repo |
 
 ---
 
-## 8. Intentionally not built
+## 8. Intentionally not built / blocked
 
-- Nepali OCR (`nep` traineddata absent) and scanned-PDF OCR (no rasteriser).
-- Bulk historical claims/sponsor ledger import.
-- Email/notifications and self-service password reset by email.
+- Managed PostgreSQL adapter and production deployment (**BLOCKED**: no server/client/credentials).
+- Nepali OCR (`nep` traineddata absent) and scanned-PDF OCR (no rasteriser) (**BLOCKED**).
+- Bulk historical claims/sponsor ledger import (**BLOCKED**: no stable source ledger; no generic importer).
+- Email/notifications and self-service password reset by email (**BLOCKED**: no SMTP/provider).
 - FX/multi-currency; multi-organisation; native mobile app.
 - Multi-instance/serverless deployment (PGlite is single-process).
+- Scheduled/offsite encrypted backups (scripts exist; no scheduler/remote storage).
+- Audit hash chain, malware scanning, application-level encryption at rest.
+- Negative-balance policy and sponsor over-receipt policy (deliberate open decisions).
 
-See `KNOWN_BUGS.md` and `TASK_QUEUE.md` for the full list and priorities.
+See `KNOWN_BUGS.md`, `TASK_QUEUE.md`, and `POSTGRESQL_MIGRATION_PLAN.md`.
 
 ---
 
@@ -153,14 +181,24 @@ npm run db:seed-demo     # evaluation only
 npm run dev
 ```
 
-Real workspace: `db:migrate` → `db:create-admin` → sign in → forced password change. See `DEPLOYMENT_GUIDE.md`.
+Real workspace: `db:migrate` → `db:create-admin` → sign in → forced password change. Production MFA: `MFA_ENFORCE=true NODE_ENV=production npm start`. See `DEPLOYMENT_GUIDE.md`.
+
+Backup:
+
+```bash
+npm run db:backup -- --out /secure/locus-backup
+npm run db:verify-backup -- --from /secure/locus-backup
+```
+
+Stop the app before backup/reset/seed.
 
 ---
 
 ## 10. Git state
 
-- Baseline research commit: `5fec879` (original docs + archive preserved).
-- Application, tests, and documentation are committed together after this state file was written.
-- `.data/`, `.next/`, `node_modules/`, `test-results/`, and `*.tsbuildinfo` are ignored.
+- Baseline research commit: `5fec879`.
+- Verification baseline: `f2a81d0`.
+- The hardening changes are currently **uncommitted** in the working tree.
+- `.data/`, `.next/`, `node_modules/`, `test-results/`, `playwright-report/`, `backups/`, and `*.tsbuildinfo` are ignored.
 
 Check the current commit with `git log --oneline -3`.

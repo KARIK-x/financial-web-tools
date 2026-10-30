@@ -174,9 +174,9 @@ Architecture Decision Records for the LOCUS Finance platform. Each entry states 
 
 ## ADR-019 — Tests use real migrations, not mocks
 
-**Decision.** Vitest runs against in-memory PGlite with the real `001`/`002` migrations; Playwright drives the real app with the demo dataset.
+**Decision.** Vitest runs against in-memory PGlite with the real `001`–`003` migrations; Playwright drives the real app with the demo dataset.
 
-**Consequences.** Constraints and triggers are exercised. Tests are slower (~14 s unit, ~26 s E2E) but catch the failures that matter in a finance system.
+**Consequences.** Constraints and triggers are exercised. Tests are slower (~20 s unit, ~21 s E2E) but catch the failures that matter in a finance system. The final suite is 117 tests across 15 files.
 
 ---
 
@@ -185,3 +185,53 @@ Architecture Decision Records for the LOCUS Finance platform. Each entry states 
 **Decision.** Where a capability is unavailable (Nepali OCR, scanned PDFs, email, FX), the UI and docs say so. No placeholder feature pretends to work.
 
 **Consequences.** Users know when to fall back to manual entry. The remaining work is explicit and prioritised.
+
+---
+
+## ADR-021 — MFA is TOTP plus hashed single-use recovery codes
+
+**Context.** ADMIN/FINANCE/EXECUTIVE can move money; a password alone is insufficient.
+
+**Decision.** Implement RFC 6238 TOTP with a ±1 step window and replay-step tracking. Generate ten recovery codes, store only SHA-256 hashes, and consume a code atomically. Enrollment is at `/mfa-setup`; recovery codes are shown once. `MFA_ENFORCE=true` requires enrollment for elevated roles. An admin reset clears the secret and revokes the target's sessions. A user cannot reset their own MFA.
+
+**Consequences.** No external identity provider or SMS dependency. A lost authenticator can be recovered with a code or an admin reset. A sole admin needs a documented break-glass procedure. Enforcement is off by default for the synthetic demo.
+
+---
+
+## ADR-022 — Period close is a posting guard, not a data rewrite
+
+**Context.** Reports must be stable after a period is presented, but corrections still need a path.
+
+**Decision.** Store periods in `accounting_periods`; closing requires a reason and is audited. `postJournal`, expense creation/submission, and payment recording call `assertDateOpen` for the business date. Reopening is authorized and audited. Closing is blocked if DRAFT journal entries exist.
+
+**Consequences.** Back-dated entries are rejected while closed. Corrections can be posted in an open period with a reference, or the period can be reopened under review. Pending claims do not block close but are recorded in the audit event.
+
+---
+
+## ADR-023 — Payment corrections are linked reversals, never edits
+
+**Context.** A recorded payment may be wrong, but deleting or editing it destroys evidence.
+
+**Decision.** `reversePayment` creates an equal-and-opposite payment and journal entry linked by `reverses_id`; the original is marked `VOID`; the claim status is recomputed; before/after is audited. Reports and aggregates exclude reversal rows.
+
+**Consequences.** The original remains inspectable and the books stay balanced. Reversing an advance payment is intentionally unsupported and must be handled as a documented exception.
+
+---
+
+## ADR-024 — Backups are verified by restoration, not by copy success
+
+**Context.** An untested backup is not a backup.
+
+**Decision.** The backup includes database, documents, checksums, manifest, git commit, and timestamp; credentials are excluded. The verifier checks checksums, counts, journal balance, and document hashes. The restore refuses a non-empty target unless forced, revokes all sessions, and writes `RESTORED_AT`. A disposable restore drill must pass before a backup is trusted.
+
+**Consequences.** Recovery is evidence-based. Scheduled/offsite encrypted storage is still an operational task; the local CLI does not replace provider PITR.
+
+---
+
+## ADR-025 — Static CSP now, nonce CSP later
+
+**Context.** The app had security headers but no CSP; a nonce-based policy requires coordinated Next.js changes.
+
+**Decision.** Enforce a static CSP with `default-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, and a narrow allow-list. Keep `unsafe-inline` for scripts/styles until a nonce/hash rollout is tested. Keep the document-response sandbox CSP separate.
+
+**Consequences.** External script injection and framing are blocked, but inline injection is not fully mitigated. A nonce-based CSP remains P2-11.

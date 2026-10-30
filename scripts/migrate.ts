@@ -1,10 +1,9 @@
-import { createDatabase } from "../src/server/db";
-import path from "node:path";
+import { createDatabase, databaseConfigFromEnv, describeDatabaseTarget } from "../src/server/db";
 
 async function main() {
-  const dataDir = process.env.DATABASE_DIR ?? path.join(process.cwd(), ".data", "pglite");
-  console.log("Applying migrations to", dataDir);
-  const db = await createDatabase({ dataDir });
+  const config = databaseConfigFromEnv();
+  console.log("Applying migrations to", describeDatabaseTarget(config));
+  const db = await createDatabase(config);
   const tables = await db.query<{ tablename: string }>(
     `SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename`,
   );

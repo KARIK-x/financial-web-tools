@@ -13,7 +13,7 @@
 | Financial ledger, claims, payments, budgets | High |
 | Receipts/invoices and bank statements | High (PII, account numbers, vendor data) |
 | Member/user identities and emails | Medium–High (PII) |
-| Password hashes, session tokens | Critical |
+| Password hashes, session tokens, MFA secrets/recovery hashes | Critical |
 | Audit trail | High (integrity evidence) |
 | Exports (CSV/JSON) | High once downloaded |
 | Database and document files on disk | Critical |
@@ -26,7 +26,7 @@
 - **FINANCE** — operations: approvals, payments, accounts, reconciliation, imports/exports, members, sponsors, budgets.
 - **EXECUTIVE** — approvals and read access; no payment execution.
 - **AUDITOR** — read-only across claims/documents/reports/audit.
-- **ADMIN** — full configuration, including the role matrix (ADMIN row immutable).
+- **ADMIN** — full configuration, including the role matrix (ADMIN row immutable) and MFA reset.
 - **CLI/DB operator** — trusted; can bypass application controls. Not defended against by design.
 
 Trust boundaries: browser → Next.js server (untrusted input), server → PGlite (trusted local process), server → filesystem (private document store), server → Tesseract (local subprocess), export consumer (outside the boundary).
@@ -42,12 +42,14 @@ Trust boundaries: browser → Next.js server (untrusted input), server → PGlit
 - Server-side sessions: 32-byte random token, only SHA-256 stored; `HttpOnly`, `SameSite=Lax`, `Secure` when `NODE_ENV=production`.
 - Session TTL: 12 hours for ADMIN/FINANCE/EXECUTIVE, 30 days for others; sign-out revokes the row; password change revokes all other sessions.
 - Admin-issued/reset accounts are forced to `/change-password` before any financial page.
-- Login rate limit: 12 attempts / 15 minutes per email+IP (in-memory).
+- **MFA:** TOTP enrollment, replay-step rejection, ten hashed single-use recovery codes, admin reset with session revocation. `MFA_ENFORCE=true` enforces ADMIN/FINANCE/EXECUTIVE; default off for the synthetic demo.
+- **Durable login rate limit:** 12 attempts / 15 minutes per email+IP in the `rate_limits` table; survives restart.
+- **Persistent lockout:** 8 failed sign-ins in 15 minutes sets `users.locked_until`.
 
 ### Authorisation
 - 19 permissions, 6 roles, 54 grants in the database.
 - Every Server Action calls `requireUser`/`requirePermission`; every restricted page calls `requirePagePermission`; API routes check permissions and return 401/403.
-- Object-level document access: uploader, claimant, or `document.view.all`.
+- Object-level document access is centralized in `canAccessDocument`: uploader, claimant, or `document.view.all`. Members only see their own uploads/claims; finance/admin see all.
 - The sidebar hides links but is **not** the control; direct URLs are guarded.
 - Denied page loads render `/no-access`; denied actions return a form error.
 - ADMIN cannot remove its own role matrix permissions (lockout prevention).
@@ -70,17 +72,37 @@ Trust boundaries: browser → Next.js server (untrusted input), server → PGlit
 ### Data integrity
 - Money as `BIGINT` paisa; no float storage.
 - Balanced-journal trigger; immutable posted lines; immutable payments/documents/bank lines; no claim deletion; terminal-state guard; self-approval block; allocation-sum checks.
+- **Payment correction:** linked equal-and-opposite reversal payment/journal; original marked `VOID`; no deletion or silent overwrite; reports exclude reversal rows to avoid double counting.
+- **Fiscal period lock:** closed periods reject journal postings, expenses, and payments; reopen is authorized and audited.
 - Audit trail append-only at the database level.
 
 ### Platform headers
-`next.config.ts` sets `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, and a restrictive `Permissions-Policy`. `poweredByHeader` is disabled.
+`next.config.ts` sets `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, a restrictive `Permissions-Policy`, and an enforced `Content-Security-Policy`. `poweredByHeader` is disabled.
+
+CSP current value:
+
+```
+default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none';
+form-action 'self'; img-src 'self' data: blob:; font-src 'self' data:;
+style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';
+connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'
+```
+
+Residual: `unsafe-inline` is required by the current Next.js inline bootstrap/styles. A nonce/hash CSP remains future work.
 
 ### Secrets and PII handling
-- No secrets in the repository; `.env*` and `.data/` are gitignored.
+- No secrets in the repository; `.env*`, `.data/`, and `backups/` are gitignored.
 - Demo/admin credentials are written to mode-0600 files and never printed.
 - The personal eSewa statement was never imported; only its layout informed the parser.
-- Audit stores actor name, not password or token; summaries may include vendor/member names (necessary for investigation).
+- Audit stores actor name, not password/token/MFA secret; summaries may include vendor/member names (necessary for investigation).
 - No request-body logging.
+
+### Backups and restore
+- Backups contain database, documents, checksums, manifest, git commit, and timestamp.
+- Credentials and environment files are excluded by default.
+- Files/directories are private (`0600`/`0700`).
+- Restore revokes all sessions in the restored database by default.
+- A genuine restore drill reproduced counts and document hashes, and E2E passed against the restored database.
 
 ### Exports
 - Require `export.run` (ADMIN/FINANCE), audited as `EXPORT_RUN`, `Cache-Control: no-store`, capped at 20,000 rows.
@@ -92,31 +114,35 @@ Trust boundaries: browser → Next.js server (untrusted input), server → PGlit
 
 | ID | Finding | Severity | Status |
 |---|---|---|---|
-| S-01 | No CSP on HTML pages | Medium | Open (P0-7) |
-| S-02 | No MFA for privileged roles | Medium | Open (P0-5) |
-| S-03 | Database/documents unencrypted at rest by the app | Medium | Mitigated by disk encryption (documented) |
-| S-04 | Rate limiting is in-memory; no persistent lockout | Medium | Open (P0-6) |
-| S-05 | PGlite single-process; no multi-instance isolation | Medium | Architectural; P0-1 |
-| S-06 | No antivirus/content scanning on uploads | Low–Medium | Open; rely on private storage + attachment disposition |
-| S-07 | No explicit CSRF token; relies on SameSite=Lax + Next Server Action origin checks | Low | Accepted for current deployment; verify on proxy setup |
-| S-08 | Audit log is not cryptographically tamper-evident | Low | Open (P2-4) |
-| S-09 | `fail()` may surface low-level database error text in a form | Low | Accepted; review messages before exposing to untrusted users |
-| S-10 | No email verification; admin-created emails are trusted | Low | Accepted for an invited-members organisation |
-| S-11 | Multiple concurrent sessions per user are allowed | Low | By design; password change revokes others |
+| S-01 | No CSP on HTML pages | Medium | **TESTED-PASS** — enforced static CSP; `unsafe-inline` residual |
+| S-02 | No MFA for privileged roles | Medium | **TESTED-PASS** — TOTP + recovery codes; enforcement via `MFA_ENFORCE` |
+| S-03 | Database/documents unencrypted at rest by the app | Medium | **NOT-TESTED** — mitigated by disk encryption (documented) |
+| S-04 | Rate limiting is in-memory; no persistent lockout | Medium | **TESTED-PASS** — durable table + persistent lockout; tests pass |
+| S-05 | PGlite single-process; no multi-instance isolation | Medium | **BLOCKED** — architectural; P0-1 |
+| S-06 | No antivirus/content scanning on uploads | Low–Medium | **NOT-TESTED** — rely on private storage + attachment disposition |
+| S-07 | No explicit CSRF token; relies on SameSite=Lax + Next Server Action origin checks | Low | **NOT-TESTED** for current deployment; verify on proxy setup |
+| S-08 | Audit log is not cryptographically tamper-evident | Low | **NOT-TESTED** — append-only triggers only |
+| S-09 | `fail()` may surface low-level database error text in a form | Low | **NOT-TESTED**; review messages before exposing to untrusted users |
+| S-10 | No email verification; admin-created emails are trusted | Low | **NOT-TESTED** for an invited-members organisation |
+| S-11 | Multiple concurrent sessions per user are allowed | Low | **TESTED-PASS**; password change revokes others |
 | S-12 | No HSTS header (proxy responsibility) | Low | Configure at the reverse proxy |
 | S-13 | Export contains PII and is not watermarked/DLP-protected | Low | Permissioned + audited; handle files per policy |
+| S-14 | One orphan document file has no DB row | Low | **NOT-TESTED** — preserved/reported; cleanup-on-failed-insert pending |
+| S-15 | A sole admin cannot reset their own MFA | Low | **NOT-TESTED** — break-glass procedure required |
 
 ### Notes on specific findings
 
-**S-01 CSP.** A nonce/hash CSP must account for Next.js inline bootstrap scripts and the app’s inline styles. Roll out in report-only mode, fix violations, then enforce. The document response already has a sandbox CSP.
+**S-01 CSP.** The static policy blocks external script origins and framing, but allows inline scripts/styles. This is a meaningful improvement over no CSP, not a complete XSS defense. A nonce/hash CSP should be rolled out in report-only mode, then enforced.
 
-**S-04 rate limiting.** The limiter keys on `login:email:ip`. An attacker rotating IPs can exceed the per-IP window, and a restart clears counters. A durable store plus progressive delays is required before exposing the app to the internet.
+**S-04 rate limiting.** The limiter is durable and restart-safe. Distributed attacks can still rotate IPs; add alerting/progressive delay if exposed to the public internet.
 
 **S-06 uploads.** Files are never executed by the server. Images are parsed by Sharp; PDFs by pdfjs; Tesseract runs on a temp file via `execFile` with fixed arguments (no shell). Inline PDFs may still exercise the browser’s PDF viewer; the sandbox CSP and attachment fallback reduce exposure. Add malware scanning if untrusted users can upload.
 
 **S-07 CSRF.** Next.js Server Actions verify the request origin by default, and the session cookie is `SameSite=Lax`. A reverse proxy must preserve the `Origin`/`Host` headers. If the app is embedded or proxied under a different origin, re-test.
 
 **S-09 error text.** Domain errors (`ExpenseError`, validation) are intentionally shown to users. Unexpected database errors may include constraint or column names. This is information disclosure, not a path to data access. A production hardening pass should map unknown errors to a generic message and log the detail server-side.
+
+**S-15 MFA reset.** Refusing self-reset prevents a compromised session from silently disabling MFA. A documented dual-control break-glass procedure is still needed for a sole administrator.
 
 ---
 
@@ -126,25 +152,37 @@ Trust boundaries: browser → Next.js server (untrusted input), server → PGlit
 |---|---|
 | Member forges a POST to approve their own claim | Rejected by permission check and DB self-approval trigger |
 | Member requests another member’s receipt by ID | 403 unless uploader/claimant or `document.view.all` |
+| Member attaches another member’s receipt to their claim | Rejected by ownership/claim checks; tested |
+| Member reviews OCR fields without permission | Rejected by `document.review`; tested |
 | Finance tries to delete a recorded payment | DB trigger rejects; must void/reverse |
 | Admin edits a posted journal line | DB trigger rejects |
 | Attacker guesses a session token | 32-byte random token; only hash stored; infeasible |
-| Stolen database file | Password hashes are scrypt; session tokens hashed; documents still readable unless disk encrypted |
+| Stolen database file | Password hashes are scrypt; session tokens hashed; MFA secrets are present but documents still readable unless disk encrypted |
 | Malicious CSV opens in Excel | Formula-leading cells prefixed with `'` |
 | Path traversal via filename | Storage key is a server-generated hash; `..` rejected |
 | Duplicate receipt to double-claim | Exact SHA-256 blocked; near-duplicate flagged for review |
-| Back-dated claim after period close | **Not prevented** — no period lock yet (P1-2) |
+| Back-dated claim after period close | **Rejected** by `accounting_periods` guard; tested |
+| Replaying a used TOTP code | **Rejected** by `mfa_last_used_step`; tested |
+| Reusing a recovery code | **Rejected** atomically; tested |
 | Insider with DB access alters audit | Possible; no hash chain/external anchor |
+| Restoring an old backup revives sessions | **Prevented** — restore revokes all sessions |
 
 ---
 
 ## 6. Production readiness
 
-**Suitable now for:** a controlled single-instance deployment on a trusted network, with HTTPS, disk encryption, restricted filesystem permissions, backups, and a small invited user base.
+**Suitable now for:** a controlled single-instance deployment on a trusted network, with HTTPS, disk encryption, restricted filesystem permissions, verified backups, MFA enforced for elevated roles, and a small invited user base.
 
 **Not yet suitable for:** public internet exposure at scale, multi-tenant use, or a threat model that includes malware-uploading outsiders.
 
-**Blocking items before real money at scale:** P0-1 (managed Postgres), P0-2 (tested backups), P0-5 (MFA), P0-6 (durable rate limiting/lockout), P0-7 (CSP), P0-8 (email/reset). P0-3/P0-4 (Nepali/scanned OCR) are usability blockers, not security blockers.
+**Blocking items before real money at scale:**
+- P0-1 managed PostgreSQL (single-process PGlite).
+- Provider-level backup/PITR and a managed restore drill.
+- P0-3/P0-4 Nepali and scanned-PDF OCR (usability, not security).
+- P0-8 email/password reset (operational).
+- S-03 encryption at rest, S-06 malware scanning, S-08 audit hash chain (risk decisions).
+
+MFA, durable rate limiting/lockout, CSP, period locks, tested backups, and document authorization are no longer open blockers.
 
 ---
 
@@ -160,3 +198,6 @@ Trust boundaries: browser → Next.js server (untrusted input), server → PGlit
 - [ ] New table with money uses `BIGINT` paisa.
 - [ ] New user-facing error does not expose schema/stack details.
 - [ ] Tests cover the denial path, not only the happy path.
+- [ ] MFA/recovery/reset changes are audited and revoke sessions where appropriate.
+- [ ] New period-sensitive mutation calls `assertDateOpen`.
+- [ ] Backup/restore changes are covered by `tests/backup-restore.test.ts`.

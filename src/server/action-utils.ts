@@ -7,6 +7,8 @@ export function ok(message?: string, redirectTo?: string): ActionResult {
 export function fail(err: unknown): ActionResult {
   if (err instanceof Error) {
     if (err.message === "UNAUTHENTICATED") return { ok: false, error: "Your session expired. Sign in again." };
+    if (err.message === "MFA_PENDING") return { ok: false, error: "Finish authenticator setup before using the workspace." };
+    if (err.message === "MFA_ENROLLMENT_REQUIRED") return { ok: false, error: "Privileged roles must enroll an authenticator before continuing." };
     if (err.message.startsWith("FORBIDDEN")) return { ok: false, error: "You do not have permission to do that." };
     return { ok: false, error: err.message };
   }

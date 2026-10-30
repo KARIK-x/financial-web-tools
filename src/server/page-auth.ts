@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser, type CurrentUser } from "./auth";
+import { getCurrentUser, mfaRequiredForRole, type CurrentUser } from "./auth";
 import { can, type Permission } from "@/lib/permissions";
 
 /**
@@ -11,6 +11,9 @@ import { can, type Permission } from "@/lib/permissions";
 export async function requirePagePermission(permission?: Permission): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (user.mfaPending || (mfaRequiredForRole(user.role) && !user.mfaEnabled && !user.mustChangePassword)) {
+    redirect("/mfa-setup");
+  }
   if (permission && !can(user.role, permission, user.permissions)) {
     redirect(`/no-access?permission=${encodeURIComponent(permission)}`);
   }

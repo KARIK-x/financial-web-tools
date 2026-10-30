@@ -1,12 +1,46 @@
 import { PGlite } from "@electric-sql/pglite";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { PgDatabase } from "./pg-db";
 import type { Executor } from "./journal";
 
-export type Db = PGlite;
+/**
+ * The application talks to one small database interface. PGlite (embedded) is
+ * the development/demo driver; `pg` (managed PostgreSQL) is the production
+ * driver. Keeping the interface explicit makes the persistence choice a
+ * deployment concern rather than a rewrite of every server module.
+ */
+export type TransactionExecutor = Executor & { exec(sql: string): Promise<unknown> };
+
+export type Db = {
+  query<T>(query: string, params?: unknown[]): Promise<{ rows: T[] }>;
+  exec(sql: string): Promise<unknown>;
+  transaction<T>(fn: (tx: TransactionExecutor) => Promise<T>): Promise<T>;
+  close(): Promise<void>;
+};
+
 export type { Executor };
 
 const MIGRATION_DIR = path.join(process.cwd(), "db", "migrations");
+
+/** Resolve the configured database without opening it. */
+export function databaseConfigFromEnv(): { dataDir?: string | null; connectionString?: string } {
+  if (process.env.DATABASE_URL) return { connectionString: process.env.DATABASE_URL };
+  return { dataDir: process.env.DATABASE_DIR ?? path.join(process.cwd(), ".data", "pglite") };
+}
+
+/** Safe display name for logs. Never prints credentials. */
+export function describeDatabaseTarget(config: { dataDir?: string | null; connectionString?: string }): string {
+  if (config.connectionString) {
+    try {
+      const url = new URL(config.connectionString);
+      return `postgresql://${url.hostname}${url.port ? `:${url.port}` : ""}${url.pathname}`;
+    } catch {
+      return "postgresql://<configured>";
+    }
+  }
+  return config.dataDir ?? "pglite://memory";
+}
 
 async function ensureMigrationsTable(db: Db) {
   await db.exec(`
@@ -35,13 +69,44 @@ export async function applyMigrations(db: Db): Promise<string[]> {
   return applied;
 }
 
-export async function createDatabase(opts: { dataDir?: string | null } = {}): Promise<Db> {
-  if (opts.dataDir) await fs.mkdir(path.dirname(opts.dataDir), { recursive: true });
-  const db = new PGlite(opts.dataDir ?? undefined);
-  await db.waitReady;
-  if (opts.dataDir) {
-    await db.exec(`SET TIME ZONE 'Asia/Kathmandu'`);
+class PgliteDatabase implements Db {
+  constructor(private readonly db: PGlite) {}
+
+  query<T>(sql: string, params: unknown[] = []): Promise<{ rows: T[] }> {
+    return this.db.query<T>(sql, params as never[]);
   }
+
+  exec(sql: string): Promise<unknown> {
+    return this.db.exec(sql);
+  }
+
+  transaction<T>(fn: (tx: TransactionExecutor) => Promise<T>): Promise<T> {
+    return this.db.transaction((tx) => fn(tx as unknown as TransactionExecutor));
+  }
+
+  async close(): Promise<void> {
+    await this.db.close();
+  }
+}
+
+export async function createDatabase(opts: {
+  dataDir?: string | null;
+  connectionString?: string;
+} = {}): Promise<Db> {
+  if (opts.connectionString) {
+    const db = new PgDatabase(opts.connectionString);
+    await db.connect();
+    await applyMigrations(db);
+    return db;
+  }
+
+  if (opts.dataDir) await fs.mkdir(path.dirname(opts.dataDir), { recursive: true });
+  const pglite = new PGlite(opts.dataDir ?? undefined);
+  await pglite.waitReady;
+  if (opts.dataDir) {
+    await pglite.exec(`SET TIME ZONE 'Asia/Kathmandu'`);
+  }
+  const db = new PgliteDatabase(pglite);
   await applyMigrations(db);
   return db;
 }
@@ -50,14 +115,21 @@ const globalForDb = globalThis as unknown as { __locusDb?: Promise<Db> };
 
 export function getDb(): Promise<Db> {
   if (!globalForDb.__locusDb) {
-    const dataDir = process.env.DATABASE_DIR ?? path.join(process.cwd(), ".data", "pglite");
-    globalForDb.__locusDb = fs
-      .mkdir(dataDir, { recursive: true })
-      .then(() => createDatabase({ dataDir }))
-      .catch((err) => {
+    const config = databaseConfigFromEnv();
+    if (!config.connectionString && config.dataDir) {
+      globalForDb.__locusDb = fs
+        .mkdir(config.dataDir, { recursive: true })
+        .then(() => createDatabase(config))
+        .catch((err) => {
+          globalForDb.__locusDb = undefined;
+          throw err;
+        });
+    } else {
+      globalForDb.__locusDb = createDatabase(config).catch((err) => {
         globalForDb.__locusDb = undefined;
         throw err;
       });
+    }
   }
   return globalForDb.__locusDb;
 }
@@ -81,7 +153,7 @@ export async function nextSequence(db: Executor, sequence: string): Promise<numb
   return Number(row?.value ?? 0);
 }
 
-/** Normalise PGlite bigint/number/string results to a JS number of paisa. */
+/** Normalise PGlite/pg bigint/number/string results to a JS number of paisa. */
 export function money(value: unknown): number {
   if (value == null) return 0;
   if (typeof value === "bigint") return Number(value);

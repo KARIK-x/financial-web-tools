@@ -8,6 +8,7 @@ import type { CurrentUser } from "./auth";
 import { can } from "@/lib/permissions";
 import { ExpenseError } from "./expenses";
 import { createHash } from "node:crypto";
+import { lockAndAssertFunds } from "./funds";
 import ExcelJS from "exceljs";
 
 export type AccountRow = {
@@ -107,6 +108,7 @@ export async function recordTransfer(
   const id = randomUUID();
   const ref = `TRF-${Date.now().toString().slice(-8)}`;
   await db.transaction(async (tx) => {
+    await lockAndAssertFunds(tx, from.id, input.date, amount.paisa, from.name);
     await tx.query(
       `INSERT INTO payments (id, ref, type, direction, from_account_id, to_account_id, amount_paisa, date_ad, reference, notes, created_by, status, is_synthetic)
        VALUES ($1,$2,'TRANSFER','OUT',$3,$4,$5,$6,$7,$8,$9,'RECORDED',$10)`,

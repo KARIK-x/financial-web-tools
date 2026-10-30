@@ -171,12 +171,13 @@ export function Stat({
   return href ? <a className={className} href={href}>{body}</a> : <div className={className}>{body}</div>;
 }
 
-export function EmptyState({ title, text, action }: { title: string; text: string; action?: ReactNode }) {
+export function EmptyState({ title, text, action, icon }: { title: string; text: string; action?: ReactNode; icon?: ReactNode }) {
   return (
     <div className="empty">
+      <div className="empty-icon">{icon ?? "∅"}</div>
       <div className="empty-title">{title}</div>
       <p className="empty-text">{text}</p>
-      {action}
+      {action ? <div style={{ marginTop: 14 }}>{action}</div> : null}
     </div>
   );
 }

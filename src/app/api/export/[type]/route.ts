@@ -4,6 +4,8 @@ import { recordAudit } from "@/server/audit";
 import { resolvePeriod } from "@/server/reports";
 import { buildExport, type ExportType } from "@/server/exports";
 import { toCsv } from "@/lib/csv";
+import ExcelJS from "exceljs";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { todayISO } from "@/lib/nepali-date";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +42,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ type
   }
 
   const url = new URL(request.url);
-  const format = url.searchParams.get("format") === "json" ? "json" : "csv";
+  const rawFormat = url.searchParams.get("format") ?? "csv";
+  const format = rawFormat === "json" ? "json" : rawFormat === "xlsx" ? "xlsx" : rawFormat === "pdf" ? "pdf" : "csv";
   const db = await getDb();
   const period = await resolvePeriod(db, url.searchParams.get("from"), url.searchParams.get("to"));
   const status = url.searchParams.get("status") ?? undefined;
@@ -78,6 +81,61 @@ export async function GET(request: Request, { params }: { params: Promise<{ type
         headers: {
           "Content-Type": "application/json; charset=utf-8",
           "Content-Disposition": `attachment; filename="locus-${type}-${stamp}.json"`,
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+
+    if (format === "xlsx") {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet(type.slice(0, 31));
+      sheet.addRow(result.headers);
+      for (const record of result.records) {
+        sheet.addRow(result.headers.map((h) => record[h]));
+      }
+      sheet.getRow(1).font = { bold: true };
+      const buffer = await workbook.xlsx.writeBuffer();
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="locus-${type}-${stamp}.xlsx"`,
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+
+    if (format === "pdf") {
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([842, 595]);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const margin = 40;
+      let y = 555;
+      page.drawText(`LOCUS Finance — ${type} export`, { x: margin, y, size: 16, font: bold, color: rgb(0.04, 0.04, 0.04) });
+      y -= 20;
+      page.drawText(`Period: ${period.from} to ${period.to} · Rows: ${result.records.length}${result.truncated ? " (truncated)" : ""}`, { x: margin, y, size: 10, font, color: rgb(0.35, 0.35, 0.35) });
+      y -= 24;
+      const cols = result.headers.slice(0, 6);
+      const colWidth = (842 - margin * 2) / cols.length;
+      cols.forEach((h, i) => {
+        page.drawText(String(h).slice(0, 24), { x: margin + i * colWidth, y, size: 9, font: bold, color: rgb(0.04, 0.04, 0.04) });
+      });
+      y -= 14;
+      const rows = result.records.slice(0, 45);
+      for (const record of rows) {
+        cols.forEach((h, i) => {
+          page.drawText(String(record[h] ?? "").slice(0, 24), { x: margin + i * colWidth, y, size: 8, font, color: rgb(0.15, 0.15, 0.15) });
+        });
+        y -= 12;
+        if (y < 40) return; // stop if page full
+      }
+      const bytes = await pdfDoc.save();
+      return new Response(Buffer.from(bytes), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="locus-${type}-${stamp}.pdf"`,
           "Cache-Control": "no-store",
           "X-Content-Type-Options": "nosniff",
         },

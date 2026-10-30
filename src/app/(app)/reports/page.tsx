@@ -93,7 +93,7 @@ export default async function ReportsPage({
     if (sp.from && sp.to) { q.set("from", sp.from); q.set("to", sp.to); }
     return `/reports?${q.toString()}`;
   };
-  const exportHref = (format: "csv" | "json") => {
+  const exportHref = (format: "csv" | "json" | "xlsx" | "pdf") => {
     const q = new URLSearchParams({ from: period.from, to: period.to, format });
     return `/api/export/${EXPORT_TYPE[type]}?${q.toString()}`;
   };
@@ -109,6 +109,8 @@ export default async function ReportsPage({
             <PrintButton label="Print report" />
             <a className="btn no-print" href={exportHref("csv")}>CSV</a>
             <a className="btn no-print" href={exportHref("json")}>JSON</a>
+            <a className="btn no-print" href={exportHref("xlsx")}>Excel</a>
+            <a className="btn no-print" href={exportHref("pdf")}>PDF</a>
           </>
         }
       />

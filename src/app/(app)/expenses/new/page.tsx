@@ -58,7 +58,8 @@ export default async function NewExpensePage() {
                 <DateField />
                 <div className="field">
                   <label className="label" htmlFor="categoryId">Category <span className="req">*</span></label>
-                  <select id="categoryId" name="categoryId" required defaultValue="cat_other">
+                  <select id="categoryId" name="categoryId" defaultValue="auto">
+                    <option value="auto">Auto-detect from merchant and description (recommended)</option>
                     {groups.map((group) => (
                       <optgroup key={group} label={group}>
                         {categories.filter((c) => c.group_name === group).map((c) => (
@@ -67,6 +68,28 @@ export default async function NewExpensePage() {
                       </optgroup>
                     ))}
                   </select>
+                </div>
+
+                <div className="field span-2">
+                  <div className="section-title" style={{ fontSize: 13, marginBottom: 6 }}>Line items (optional)</div>
+                  <div className="tiny muted" style={{ marginBottom: 8 }}>Quantity × unit price is calculated automatically. Item totals must equal the expense total.</div>
+                  <div className="table-wrap">
+                    <table className="data">
+                      <thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Unit price</th><th>Discount</th><th>Tax</th></tr></thead>
+                      <tbody>
+                        {[0,1,2].map((i) => (
+                          <tr key={i}>
+                            <td><input name="itemDescription" placeholder="Item" /></td>
+                            <td><input name="itemQty" inputMode="decimal" placeholder="1" defaultValue={i === 0 ? "1" : ""} /></td>
+                            <td><input name="itemUnit" placeholder="pcs" /></td>
+                            <td><input name="itemUnitPrice" inputMode="decimal" placeholder="0.00" /></td>
+                            <td><input name="itemDiscount" inputMode="decimal" placeholder="0.00" /></td>
+                            <td><input name="itemTax" inputMode="decimal" placeholder="0.00" /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
                 <div className="field span-2">
