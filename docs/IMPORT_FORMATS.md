@@ -20,7 +20,7 @@ There is deliberately **no generic spreadsheet importer**. Guessing column meani
 
 The historical sponsor files supplied outside the repository were inspected read-only. They are not a stable ledger:
 
-- `Sponsorships of LOCUS 2021.xlsx` — 1,005 rows, 26 columns; mixed company/contact/status/amount free text across years.
+- `Sponsorships of FINANCE TRACKER 2021.xlsx` — 1,005 rows, 26 columns; mixed company/contact/status/amount free text across years.
 - Other sponsor workbooks/proposals in the same folder — heterogeneous columns, merged cells, planning notes, no receipt-level schema.
 
 A bulk import of these files would require a human-approved column mapping, a dry-run diff, provenance, and per-row validation. That importer does not exist. The files were **not** modified or imported, and no historical cash total is asserted.
@@ -69,7 +69,7 @@ If no header row is found, the import is rejected with: *“Could not find a sta
 ### 2.5 Example CSV
 
 ```csv
-Account Name:,LOCUS — IOE Pulchowk Campus
+Account Name:,FINANCE TRACKER — IOE Pulchowk Campus
 Statement Period:,2026-07-17 to 2027-07-16
 
 Transaction Date,Description,Reference,Withdrawal,Deposit,Balance

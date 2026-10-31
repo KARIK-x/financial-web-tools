@@ -6,7 +6,7 @@ const CREDENTIALS = readFileSync(path.join(process.cwd(), ".data", "demo-credent
 const PASSWORD = CREDENTIALS.match(/Shared password:\s*(\S+)/)![1]!;
 
 const EMAILS = Object.fromEntries(
-  [...CREDENTIALS.matchAll(/([a-z]+)@locus\.demo/g)].map((m) => [m[1]!, `${m[1]}@locus.demo`]),
+  [...CREDENTIALS.matchAll(/([a-z]+)@finance-tracker\.demo/g)].map((m) => [m[1]!, `${m[1]}@finance-tracker.demo`]),
 ) as Record<"admin" | "finance" | "executive" | "events" | "member" | "auditor", string>;
 
 async function login(page: Page, who: keyof typeof EMAILS): Promise<void> {
@@ -17,7 +17,7 @@ async function login(page: Page, who: keyof typeof EMAILS): Promise<void> {
   await expect(page).toHaveURL(/\/overview/);
 }
 
-test.describe.serial("LOCUS finance end-to-end", () => {
+test.describe.serial("Finance Tracker finance end-to-end", () => {
   test("member can sign in and create a claim", async ({ page }) => {
     await login(page, "member");
 

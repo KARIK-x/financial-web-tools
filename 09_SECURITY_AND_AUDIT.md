@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-24
 
-## 1. Threat Model (realistic for LOCUS)
+## 1. Threat Model (realistic for FINANCE TRACKER)
 
 Primary threats: (a) account takeover of the FM or a member (credential sharing, phishing, lost phone); (b) unauthorized viewing of financial data by non-committee members or outsiders; (c) tampering with records by a departing member; (d) accidental deletion/corruption; (e) data leakage via exports or external OCR. Nation-state and sophisticated adversaries are out of scope.
 

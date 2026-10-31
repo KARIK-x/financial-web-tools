@@ -1,8 +1,8 @@
-# LOCUS Finance Intelligence Platform
+# Finance Tracker Intelligence Platform
 
-A double-entry finance system for LOCUS, IOE Pulchowk Campus: expense claims, approvals, payments, advances, sponsorships, budgets, receipts, bank reconciliation, reports, and an append-only audit trail.
+A double-entry finance system for FINANCE TRACKER, IOE Pulchowk Campus: expense claims, approvals, payments, advances, sponsorships, budgets, receipts, bank reconciliation, reports, and an append-only audit trail.
 
-> **Data honesty:** the supplied research material contained no usable LOCUS ledger. This repository ships a **synthetic demo dataset** for evaluation. It is not a reconstruction of real LOCUS finances. Every demo row is marked synthetic.
+> **Data honesty:** the supplied research material contained no usable FINANCE TRACKER ledger. This repository ships a **synthetic demo dataset** for evaluation. It is not a reconstruction of real Finance Tracker finances. Every demo row is marked synthetic.
 
 ## Quick start (demo)
 
@@ -73,4 +73,4 @@ Next.js 16 · React 19 · TypeScript 5.9 (strict) · Tailwind 4 · PGlite (embed
 
 ## License / ownership
 
-Internal project for LOCUS, IOE Pulchowk Campus. No license was supplied; treat as private.
+Internal project for FINANCE TRACKER, IOE Pulchowk Campus. No license was supplied; treat as private.

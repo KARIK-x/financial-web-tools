@@ -6,7 +6,7 @@ export function ThemeToggle() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
-    const stored = localStorage.getItem("locus-theme");
+    const stored = localStorage.getItem("finance-tracker-theme");
     const initial = stored === "dark" ? "dark" : "light";
     setTheme(initial);
     document.documentElement.setAttribute("data-theme", initial);
@@ -15,7 +15,7 @@ export function ThemeToggle() {
   const toggle = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    localStorage.setItem("locus-theme", next);
+    localStorage.setItem("finance-tracker-theme", next);
     document.documentElement.setAttribute("data-theme", next);
   };
 

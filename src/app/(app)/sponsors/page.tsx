@@ -69,7 +69,7 @@ export default async function SponsorsPage() {
             ) : (
               <EmptyState
                 title="No sponsorship agreements recorded"
-                text="Create an agreement when a sponsor commits. Do not enter a receipt until money actually reaches a LOCUS account."
+                text="Create an agreement when a sponsor commits. Do not enter a receipt until money actually reaches a FINANCE TRACKER account."
               />
             )}
           </div>

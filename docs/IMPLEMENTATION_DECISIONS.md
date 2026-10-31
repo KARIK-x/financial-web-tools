@@ -1,6 +1,6 @@
 # IMPLEMENTATION DECISIONS
 
-Architecture Decision Records for the LOCUS Finance platform. Each entry states the context, the decision, and the consequence. Decisions are dated 2026-10-24 unless noted.
+Architecture Decision Records for the Finance Tracker platform. Each entry states the context, the decision, and the consequence. Decisions are dated 2026-10-24 unless noted.
 
 ---
 
@@ -71,7 +71,7 @@ Architecture Decision Records for the LOCUS Finance platform. Each entry states 
 
 ## ADR-007 — Personal vs organisational funding determines the credit account
 
-**Context.** Reimbursing a member and paying a vendor from LOCUS funds are economically different.
+**Context.** Reimbursing a member and paying a vendor from FINANCE TRACKER funds are economically different.
 
 **Decision.**
 - Personal funds (`reimbursement_required = true`): approval debits the expense category and credits **2000 Member reimbursements payable**; payment debits 2000 and credits cash/bank/wallet.
@@ -166,7 +166,7 @@ Architecture Decision Records for the LOCUS Finance platform. Each entry states 
 
 ## ADR-018 — Single organisation, NPR only
 
-**Decision.** One organisation row (`org_locus`), one currency (NPR), no FX. `organizations` exists to make a future multi-tenant migration possible, but queries are not org-scoped.
+**Decision.** One organisation row (`org_finance-tracker`), one currency (NPR), no FX. `organizations` exists to make a future multi-tenant migration possible, but queries are not org-scoped.
 
 **Consequences.** Simpler, correct accounting now. Multi-org requires schema and query changes, tracked in `TASK_QUEUE.md`.
 

@@ -13,7 +13,7 @@
 ## 2. Information Architecture & Navigation
 
 ```
-LOCUS Finance
+Finance Tracker
 ├── Dashboard (role-aware)
 ├── Expenses
 │   ├── My Expenses (claimant)

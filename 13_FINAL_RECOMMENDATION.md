@@ -4,7 +4,7 @@
 
 ## 1. The Decision
 
-**Build a custom LOCUS Finance Intelligence Platform.** Do not adopt Zoho Expense, Expensify, SAP Concur, or QuickBooks (see 03 for the verified comparison). The decisive reason: LOCUS's core need is reconstructing and governing a fragmented financial past plus a multi-member spending present, and commercial expense tools solve neither — they start from clean corporate spend with card feeds and tax engines LOCUS doesn't have, at recurring per-user cost, without historical ingestion, and with weaker institutional continuity.
+**Build a custom Finance Tracker Intelligence Platform.** Do not adopt Zoho Expense, Expensify, SAP Concur, or QuickBooks (see 03 for the verified comparison). The decisive reason: Finance Tracker's core need is reconstructing and governing a fragmented financial past plus a multi-member spending present, and commercial expense tools solve neither — they start from clean corporate spend with card feeds and tax engines FINANCE TRACKER doesn't have, at recurring per-user cost, without historical ingestion, and with weaker institutional continuity.
 
 ## 2. What to build first (Phase 1, 10–16 weeks)
 
@@ -42,4 +42,4 @@ Until then: **no application implementation has been or should be started.**
 
 ## 6. Expected outcome
 
-Within one committee cycle, LOCUS will be able to state, from evidence: how much it has spent and on what, who is owed money, which sponsors have paid, what cash it truly holds, and what share of its records are verified — with every number drillable to a transaction and every transaction drillable to a document.
+Within one committee cycle, FINANCE TRACKER will be able to state, from evidence: how much it has spent and on what, who is owed money, which sponsors have paid, what cash it truly holds, and what share of its records are verified — with every number drillable to a transaction and every transaction drillable to a document.

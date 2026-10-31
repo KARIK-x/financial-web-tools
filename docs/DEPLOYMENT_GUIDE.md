@@ -1,6 +1,6 @@
 # DEPLOYMENT GUIDE
 
-This guide runs the LOCUS Finance platform locally or on a single trusted server. It is **not** a guide for serverless or multi-instance deployment; PGlite is single-process (see §9).
+This guide runs the Finance Tracker platform locally or on a single trusted server. It is **not** a guide for serverless or multi-instance deployment; PGlite is single-process (see §9).
 
 ---
 
@@ -28,7 +28,7 @@ tesseract --version   # optional
 ## 2. First run (real workspace)
 
 ```bash
-cd "/path/to/LOCUS FINANCE AUTOMATION"
+cd "/path/to/FINANCE TRACKER AUTOMATION"
 npm ci
 npm run db:migrate
 npm run db:create-admin -- --email=finance@your-org.org --name="Finance Manager"
@@ -58,9 +58,9 @@ Open `http://localhost:3000` → sign in with the email and the password from th
 |---|---|---|
 | `DATABASE_DIR` | `.data/pglite` | PGlite data directory |
 | `DOCUMENT_DIR` | `.data/documents` | Private document storage |
-| `LOCUS_ADMIN_EMAIL` | — | Alternative to `--email` for `db:create-admin` |
-| `LOCUS_ADMIN_NAME` | — | Alternative to `--name` |
-| `LOCUS_ADMIN_PASSWORD` | generated | Alternative to `--password`; avoid exporting secrets in shared shells |
+| `FINANCE_TRACKER_ADMIN_EMAIL` | — | Alternative to `--email` for `db:create-admin` |
+| `FINANCE_TRACKER_ADMIN_NAME` | — | Alternative to `--name` |
+| `FINANCE_TRACKER_ADMIN_PASSWORD` | generated | Alternative to `--password`; avoid exporting secrets in shared shells |
 | `NODE_ENV` | — | Set to `production` for `Secure` session cookies |
 | `MFA_ENFORCE` | off | Set to `true` to require TOTP enrollment for ADMIN/FINANCE/EXECUTIVE |
 | `E2E_BASE_URL` | `http://localhost:3000` | Point Playwright at an already-running server |
@@ -99,7 +99,7 @@ npm run db:seed-demo
 npm run dev
 ```
 
-- Demo logins: `admin@`, `finance@`, `executive@`, `events@`, `member@`, `auditor@` `locus.demo`.
+- Demo logins: `admin@`, `finance@`, `executive@`, `events@`, `member@`, `auditor@` `finance-tracker.demo`.
 - The shared password is in **`.data/demo-credentials.txt`** (mode 0600). It is never printed to the terminal or written to docs.
 - The dataset is synthetic: claims, payments, documents, journals, bank lines, budgets, advances, sponsors.
 - The UI shows synthetic source tags; `is_synthetic` is set on every seeded row.
@@ -136,13 +136,13 @@ Use systemd, launchd, or a process manager with restart-on-failure. Example syst
 
 ```ini
 [Unit]
-Description=LOCUS Finance
+Description=Finance Tracker
 After=network.target
 
 [Service]
 Type=simple
-User=locus
-WorkingDirectory=/srv/locus-finance
+User=finance-tracker
+WorkingDirectory=/srv/finance-tracker
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/npm start
 Restart=on-failure
@@ -156,8 +156,8 @@ WantedBy=multi-user.target
 Stop the app, then run the tested scripts:
 
 ```bash
-npm run db:backup -- --out /secure/locus-backups/$(date +%Y%m%d-%H%M%S)
-npm run db:verify-backup -- --from /secure/locus-backups/<timestamp>
+npm run db:backup -- --out /secure/finance-tracker-backups/$(date +%Y%m%d-%H%M%S)
+npm run db:verify-backup -- --from /secure/finance-tracker-backups/<timestamp>
 ```
 
 Set up the restore procedure in `BACKUP_AND_RESTORE.md` **before** entering real data. A backup that has never been restored is not a backup. Scheduled/offsite encrypted backups are not configured; that remains an operational task.

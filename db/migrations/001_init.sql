@@ -1,4 +1,4 @@
--- LOCUS Finance Platform — initial schema
+-- Finance Tracker Platform — initial schema
 -- Money is stored as BIGINT paisa (1 NPR = 100 paisa). Never floating point.
 -- All timestamps are timestamptz. Business dates are DATE + explicit calendar.
 
@@ -227,7 +227,7 @@ CREATE TABLE expense_claims (
   fx_rate numeric(14,6),
   description text NOT NULL,
   business_purpose text,
-  funding_source text NOT NULL CHECK (funding_source IN ('PERSONAL','LOCUS_CASH','LOCUS_BANK')),
+  funding_source text NOT NULL CHECK (funding_source IN ('PERSONAL','FINANCE_TRACKER_CASH','FINANCE_TRACKER_BANK')),
   payment_method text,
   reimbursement_required boolean NOT NULL DEFAULT false,
   receipt_required boolean NOT NULL DEFAULT true,

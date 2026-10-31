@@ -37,7 +37,7 @@ async function writeCredentials(email: string, password: string) {
   await fs.writeFile(
     file,
     [
-      "LOCUS Finance — initial administrator credentials",
+      "Finance Tracker — initial administrator credentials",
       "Generated locally. Delete this file after the first sign-in.",
       "",
       `Email:    ${email}`,
@@ -53,10 +53,10 @@ async function writeCredentials(email: string, password: string) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const email = String(args.email ?? process.env.LOCUS_ADMIN_EMAIL ?? "").trim().toLowerCase();
-  const name = String(args.name ?? process.env.LOCUS_ADMIN_NAME ?? "").trim();
+  const email = String(args.email ?? process.env.FINANCE_TRACKER_ADMIN_EMAIL ?? "").trim().toLowerCase();
+  const name = String(args.name ?? process.env.FINANCE_TRACKER_ADMIN_NAME ?? "").trim();
   const reset = Boolean(args["reset-password"]);
-  let password = String(args.password ?? process.env.LOCUS_ADMIN_PASSWORD ?? "");
+  let password = String(args.password ?? process.env.FINANCE_TRACKER_ADMIN_PASSWORD ?? "");
   const generated = !password;
 
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {

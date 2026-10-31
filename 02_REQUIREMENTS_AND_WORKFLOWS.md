@@ -6,11 +6,11 @@
 
 | Role | Description | Key permissions |
 |---|---|---|
-| **Finance Manager (FM)** | Accountable owner of LOCUS finances | Everything incl. verification, reconciliation, exports, settings |
+| **Finance Manager (FM)** | Accountable owner of Finance Tracker finances | Everything incl. verification, reconciliation, exports, settings |
 | **Finance Team Member** | Deputy; shares operational load | Approve, verify, reconcile, import; cannot change roles/permissions or delete org data |
 | **Committee Executive** (President/Secretary) | Oversight | Read all + approve over-threshold items; no data entry required |
 | **Event/Department Head** | Owns an event budget | Submit own expenses, view own event's finances, approve member claims under threshold |
-| **Expense Claimant** (any LOCUS member) | Spends money for LOCUS | Submit expenses/advances, view own submissions |
+| **Expense Claimant** (any FINANCE TRACKER member) | Spends money for FINANCE TRACKER | Submit expenses/advances, view own submissions |
 | **Read-only Auditor** | Internal audit / campus oversight | Read everything, export nothing, edit nothing |
 
 **Separation of duties (hard rules):**
@@ -23,7 +23,7 @@
 1. Member opens "Submit Expense" (mobile-first, ≤2 min target).
 2. Photographs receipt (or uploads existing file / PDF).
 3. OCR auto-fills: date, amount, merchant, invoice number. Member corrects fields (corrections are captured — see data provenance).
-4. Member selects: event/department, category, payee details — *who actually paid* (self personal money / LOCUS cash / LOCUS bank), payment method, whether reimbursement is required.
+4. Member selects: event/department, category, payee details — *who actually paid* (self personal money / FINANCE TRACKER cash / FINANCE TRACKER bank), payment method, whether reimbursement is required.
 5. Submits → status `SUBMITTED`. Claimant cannot edit after submission (must withdraw and resubmit, which is logged).
 6. Approver reviews receipt image + fields → `APPROVED` or `REJECTED` (reason mandatory).
 7. If reimbursement required → enters `PENDING_REIMBURSEMENT` queue; FM records payment (date, method, reference) → `REIMBURSED`.

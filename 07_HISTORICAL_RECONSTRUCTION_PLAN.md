@@ -4,7 +4,7 @@
 
 ## 1. Objective
 
-Produce a **declared historical financial baseline** — the best-supported statement of LOCUS's past finances given available evidence — with explicit completeness and confidence indicators. It is acceptable for the baseline to say "NPR X ± uncertainty, with Y% of expected documentation located." It is not acceptable to fabricate precision.
+Produce a **declared historical financial baseline** — the best-supported statement of Finance Tracker's past finances given available evidence — with explicit completeness and confidence indicators. It is acceptable for the baseline to say "NPR X ± uncertainty, with Y% of expected documentation located." It is not acceptable to fabricate precision.
 
 ## 2. Inputs (support any subset)
 
@@ -34,7 +34,7 @@ Receipt photos, scans, PDF invoices, digital invoices, spreadsheets (expense reg
 
 **S6 — Reviewer queue (human-in-the-loop).** Prioritized by value × (1−confidence). Reviewer actions per candidate: confirm → promote to `expense_claim` (state=VERIFIED after evidence check) / link to existing claim / mark duplicate / mark non-financial / request info. Conflicts (OCR says 3,500, member said 3,050) surfaced side-by-side; resolution stored as the claim value with the discrepancy preserved in notes. Reviewer identity + timestamp on every decision.
 
-**S7 — Reconciliation pass.** Matched payments vs statements vs cash records; differences listed explicitly (timing, missing, amount mismatch). Unmatched statement lines = "unexplained outflows/inflows" list — potentially LOCUS expenses with lost receipts (member asked) or transfers.
+**S7 — Reconciliation pass.** Matched payments vs statements vs cash records; differences listed explicitly (timing, missing, amount mismatch). Unmatched statement lines = "unexplained outflows/inflows" list — potentially FINANCE TRACKER expenses with lost receipts (member asked) or transfers.
 
 **S8 — Baseline declaration.** FM publishes baseline snapshot: total verified historical expenditure; claimed-but-unverified; documented incompleteness (e.g., "bank statements available 2078–2080 only; expected document coverage ~82%"); confidence histogram. Snapshot is immutable; later corrections are new baseline versions (v2, v3...) with diffs.
 

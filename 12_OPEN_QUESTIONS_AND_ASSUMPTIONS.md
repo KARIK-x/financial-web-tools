@@ -6,9 +6,9 @@
 
 | # | Assumption | Basis | Impact if wrong |
 |---|---|---|---|
-| A1 | LOCUS has no formal legal registration (no PAN, no VAT, no NGO registration) | Brief explicitly says do not assume entity type; typical for campus clubs | Compliance module settings change; sponsor receipts may need PAN (Q3) |
-| A2 | Functional currency is exclusively NPR | LOCUS operates in Nepal; no evidence of foreign accounts | FX features postponed; trivial to add later |
-| A3 | LOCUS holds one bank account plus petty cash | Brief mentions organizational cash balances and bank statements generally | Account model handles N accounts; none required |
+| A1 | FINANCE TRACKER has no formal legal registration (no PAN, no VAT, no NGO registration) | Brief explicitly says do not assume entity type; typical for campus clubs | Compliance module settings change; sponsor receipts may need PAN (Q3) |
+| A2 | Functional currency is exclusively NPR | FINANCE TRACKER operates in Nepal; no evidence of foreign accounts | FX features postponed; trivial to add later |
+| A3 | FINANCE TRACKER holds one bank account plus petty cash | Brief mentions organizational cash balances and bank statements generally | Account model handles N accounts; none required |
 | A4 | Annual transaction volume is low hundreds of receipts/year | Student org scale; 80–90% receipt availability suggests bounded backlog | Capacity planning; stack is over-provisioned anyway |
 | A5 | Committee year = fiscal-year-ish handover (roughly Shrawan) | Nepali academic/committee cycle | Period closing defaults adjustable |
 | A6 | Members have smartphones; low-end Android dominant | Nepal device market reality | Mobile-first, low-bandwidth design justified |
@@ -18,9 +18,9 @@
 
 | # | Question | Blocks | Priority |
 |---|---|---|---|
-| Q1 | What is LOCUS's exact institutional status (campus-registered club? NGO? unregistered?) and does it have a PAN? | Compliance configuration; sponsor receipt format | **Critical** |
-| Q2 | Which bank(s) does LOCUS use, and can we obtain historical statements (how far back)? | Reconstruction completeness; P3 design | **Critical** |
-| Q3 | Do sponsors require LOCUS to have a PAN or issue specific receipt formats for their own tax purposes? | Sponsorship module fields | High |
+| Q1 | What is Finance Tracker's exact institutional status (campus-registered club? NGO? unregistered?) and does it have a PAN? | Compliance configuration; sponsor receipt format | **Critical** |
+| Q2 | Which bank(s) does FINANCE TRACKER use, and can we obtain historical statements (how far back)? | Reconstruction completeness; P3 design | **Critical** |
+| Q3 | Do sponsors require FINANCE TRACKER to have a PAN or issue specific receipt formats for their own tax purposes? | Sponsorship module fields | High |
 | Q4 | Where is the historical material today (drives, phones, papers) and who controls access? | Phase 0 inventory | **Critical** |
 | Q5 | Are there existing spreadsheets/registers of expenses or sponsorships? What format? | Import mapping design | High |
 | Q6 | Are there outstanding member reimbursements or advances right now, and are they written anywhere? | Opening balances; trust | **Critical** |

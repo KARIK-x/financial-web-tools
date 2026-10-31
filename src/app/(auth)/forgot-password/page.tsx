@@ -9,7 +9,7 @@ export default function ForgotPasswordPage() {
     <>
       <section className="auth-art">
         <div>
-          <div className="auth-kicker">LOCUS · IOE Pulchowk Campus</div>
+          <div className="auth-kicker">FINANCE TRACKER · IOE Pulchowk Campus</div>
           <h2 className="auth-headline">
             Recover access
             <br />
@@ -32,13 +32,13 @@ export default function ForgotPasswordPage() {
         <div className="auth-card">
           <div className="eyebrow">Account recovery</div>
           <h1 className="page-title">Forgot password</h1>
-          <p className="page-sub">Enter the email address issued by the LOCUS finance team.</p>
+          <p className="page-sub">Enter the email address issued by the Finance Tracker finance team.</p>
 
           <div style={{ marginTop: 24 }}>
             <ActionForm action={requestPasswordResetAction} submitLabel="Send reset link" className="grid">
               <div className="field">
                 <label className="label" htmlFor="email">Email</label>
-                <input id="email" name="email" type="email" autoComplete="username" required placeholder="you@locus.org.np" />
+                <input id="email" name="email" type="email" autoComplete="username" required placeholder="you@finance-tracker.org.np" />
               </div>
             </ActionForm>
           </div>

@@ -72,7 +72,7 @@ export function verifyTotp(secret: string, token: string): number | null {
 }
 
 export function otpauthUri(input: { secret: string; email: string; issuer?: string }): string {
-  const issuer = input.issuer ?? "LOCUS Finance";
+  const issuer = input.issuer ?? "Finance Tracker";
   const label = encodeURIComponent(`${issuer}:${input.email}`);
   const params = new URLSearchParams({
     secret: input.secret,

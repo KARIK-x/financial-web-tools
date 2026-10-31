@@ -8,17 +8,17 @@
 
 Rationale: a student org needs correctness and traceability more than full GAAP. A claim/payment model with explicit states + provenance gives that with far less complexity. However, the schema below is deliberately shaped so a journal can be layered on: money-movement events (payment, reimbursement, receipt, advance) each get immutable journal lines in Phase 3 without redesign. This is the same hybrid pattern lightweight fund-accounting tools use.
 
-**Basis of reporting:** cash basis for P1–P2 reports (matches LOCUS reality — no receivables/inventory complexity beyond sponsorships); accrual view in P3 when the journal exists. Sponsorship commitments are always visible as pipeline data regardless of basis — never blended into income until received.
+**Basis of reporting:** cash basis for P1–P2 reports (matches FINANCE TRACKER reality — no receivables/inventory complexity beyond sponsorships); accrual view in P3 when the journal exists. Sponsorship commitments are always visible as pipeline data regardless of basis — never blended into income until received.
 
-**Preventing double-count (worked rule):** an expense paid personally and later reimbursed is **one expense + one payment-out (reimbursement)**. The expense's `paid_by = member`, `funding_source = member_personal`; when LOCUS reimburses, a `Payment` (type=reimbursement) links expense ↔ member, and the expense status moves to REIMBURSED — the amount is never summed from both records. If paid directly from LOCUS cash/bank, `funding_source = locus_cash/bank`, `Payment` type=expense_payment, no reimbursement exists. Splits create allocation lines, not duplicate expenses.
+**Preventing double-count (worked rule):** an expense paid personally and later reimbursed is **one expense + one payment-out (reimbursement)**. The expense's `paid_by = member`, `funding_source = member_personal`; when FINANCE TRACKER reimburses, a `Payment` (type=reimbursement) links expense ↔ member, and the expense status moves to REIMBURSED — the amount is never summed from both records. If paid directly from FINANCE TRACKER cash/bank, `funding_source = finance_tracker_cash/bank`, `Payment` type=expense_payment, no reimbursement exists. Splits create allocation lines, not duplicate expenses.
 
 ## 2. Entity Descriptions (condensed)
 
 | Entity | Purpose | Key fields / notes |
 |---|---|---|
-| organization | LOCUS (single-tenant now, multi-tenant safe) | name, fiscal_year_start, currency=NPR, settings jsonb |
+| organization | FINANCE TRACKER (single-tenant now, multi-tenant safe) | name, fiscal_year_start, currency=NPR, settings jsonb |
 | app_user / role / permission | AuthN/Z | Supabase Auth users; RBAC tables; org-scoped |
-| member | LOCUS person | name, program, batch, contact, active flag |
+| member | FINANCE TRACKER person | name, program, batch, contact, active flag |
 | department / event | Org structure & activity hierarchy | event: start/end dates, owner, status |
 | expense_category | Chart of accounts (light) | code, name, parent, requires_receipt flag |
 | vendor / sponsor | Counterparties | sponsor adds contact, sector |

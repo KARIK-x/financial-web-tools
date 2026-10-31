@@ -13,7 +13,7 @@ describe("storage security", () => {
   let cleanup: typeof import("@/server/storage-cleanup");
 
   beforeAll(async () => {
-    root = await mkdtemp(path.join(os.tmpdir(), "locus-storage-"));
+    root = await mkdtemp(path.join(os.tmpdir(), "finance-tracker-storage-"));
     process.env.DOCUMENT_DIR = root;
     storage = await import("@/server/storage");
     cleanup = await import("@/server/storage-cleanup");
@@ -62,7 +62,7 @@ describe("storage security", () => {
   it("refuses orphan deletion when a key resolves outside the root", async () => {
     const db: Db = await createTestDb();
     try {
-      const outside = path.join(os.tmpdir(), `locus-outside-${Date.now()}.txt`);
+      const outside = path.join(os.tmpdir(), `finance-tracker-outside-${Date.now()}.txt`);
       await writeFile(outside, Buffer.from("do not delete"));
       const orphan: OrphanFile = { key: "../" + path.basename(outside), bytes: 16, modifiedAt: new Date(0) };
       const result = await cleanup.deleteOrphanDocumentFiles(db, [orphan], { root, actorName: "test" });

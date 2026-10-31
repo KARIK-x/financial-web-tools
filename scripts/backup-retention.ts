@@ -14,7 +14,7 @@ async function main() {
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   const old = [];
   for (const entry of entries) {
-    if (!entry.isDirectory() || !entry.name.startsWith("locus-")) continue;
+    if (!entry.isDirectory() || !entry.name.startsWith("finance-tracker-")) continue;
     const full = path.join(root, entry.name);
     const stat = await fs.stat(full);
     if (stat.mtime.getTime() < cutoff) old.push({ name: entry.name, full, mtime: stat.mtime });

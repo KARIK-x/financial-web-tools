@@ -196,4 +196,4 @@ Status labels: **IMPLEMENTED**, **TESTED-PASS**, **TESTED-FAIL**, **NOT-TESTED**
 
 **P0-1 (managed PostgreSQL) followed by the provider-level PITR/restore drill.** The data store is now backed up and restorable, but it is still single-process and local. Everything else can be layered on once the database is durable and recoverable.
 
-If LOCUS needs to process real receipts before that migration, do **P0-3/P0-4** first so manual re-keying does not become the bottleneck — but keep the deployment single-instance and backed up until P0-1 is done.
+If FINANCE TRACKER needs to process real receipts before that migration, do **P0-3/P0-4** first so manual re-keying does not become the bottleneck — but keep the deployment single-instance and backed up until P0-1 is done.

@@ -2,7 +2,7 @@
 
 **Run date:** 2026-10-24
 **Environment:** macOS (darwin), Node v24.20.0, local PGlite, system Chrome for E2E.
-**Repository:** `/Users/ashim/Downloads/LOCUS FINANCE AUTOMATION`
+**Repository:** `/Users/ashim/Downloads/FINANCE TRACKER AUTOMATION`
 
 Every result below was produced by running the command in the project root. No results are estimated. Baseline and post-remediation results are separated so prior claims are not confused with current evidence.
 
@@ -187,7 +187,7 @@ The E2E suite added synthetic claims/payments. The earlier seed state (9 claims,
 
 ## 8. Backup and restore drill
 
-**Backup:** `/Users/ashim/locus-backups/20261024-160509-final-drill`
+**Backup:** `/Users/ashim/finance-tracker-backups/20261024-160509-final-drill`
 
 | Step | Command | Result |
 |---|---|---|
@@ -255,7 +255,7 @@ Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none';
 ## 12. Reproducing
 
 ```bash
-cd "/Users/ashim/Downloads/LOCUS FINANCE AUTOMATION"
+cd "/Users/ashim/Downloads/FINANCE TRACKER AUTOMATION"
 npm ci
 npx tsc --noEmit
 npm test
@@ -268,8 +268,8 @@ The E2E suite starts its own dev server unless `E2E_BASE_URL` is set. It adds sy
 Backup verification:
 
 ```bash
-npm run db:backup -- --out /secure/locus-backup
-npm run db:verify-backup -- --from /secure/locus-backup
+npm run db:backup -- --out /secure/finance-tracker-backup
+npm run db:verify-backup -- --from /secure/finance-tracker-backup
 ```
 
 Stop any running app before backup/restore/reset/seed.

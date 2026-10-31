@@ -115,7 +115,7 @@ async function prepareImage(bytes: Buffer): Promise<Buffer> {
 }
 
 async function tesseractBuffer(bytes: Buffer, languages: string): Promise<{ text: string } | { error: string }> {
-  const tmp = path.join(os.tmpdir(), `locus-ocr-${Date.now()}-${Math.random().toString(16).slice(2)}.png`);
+  const tmp = path.join(os.tmpdir(), `finance-tracker-ocr-${Date.now()}-${Math.random().toString(16).slice(2)}.png`);
   try {
     await fs.writeFile(tmp, await prepareImage(bytes));
     const attempt = async (psm: string) => {

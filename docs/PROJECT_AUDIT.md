@@ -1,4 +1,4 @@
-# PROJECT AUDIT — LOCUS Finance Intelligence Platform
+# PROJECT AUDIT — Finance Tracker Intelligence Platform
 
 **Audit date:** 2026-10-24
 **Auditor:** implementation agent (autonomous build session)
@@ -11,13 +11,13 @@
 | Input | What it actually contains | Reliability |
 |---|---|---|
 | `01_EXECUTIVE_SUMMARY.md` … `13_FINAL_RECOMMENDATION.md` | Product research, workflows, Nepal compliance notes, data-model sketch, security guidance, roadmap | **Design intent**, not financial records |
-| `KIMI LOCUS FINACNEArchive.zip` | Original copy of the research material | Same as above; preserved untouched |
+| `KIMI FINANCE TRACKER FINACNEArchive.zip` | Original copy of the research material | Same as above; preserved untouched |
 | Sponsor / tier workbooks | One summary workbook has 8 tier rows totalling **NPR 150,000**; the wider folder contains 1,000+ row planning/contact sheets across years | **Incomplete** — heterogeneous columns, no payer/date/receipt-level ledger |
-| eSewa statement | A **personal** wallet statement, not a LOCUS organisational account | **PII — must not be imported or exposed** |
-| Everything else | No bank statements, receipts, invoices, or historical ledger for LOCUS | **Absent** |
+| eSewa statement | A **personal** wallet statement, not a FINANCE TRACKER organisational account | **PII — must not be imported or exposed** |
+| Everything else | No bank statements, receipts, invoices, or historical ledger for FINANCE TRACKER | **Absent** |
 
 ### Consequence
-No LOCUS financial history can be reconstructed from the supplied material. The system therefore:
+No FINANCE TRACKER financial history can be reconstructed from the supplied material. The system therefore:
 
 1. starts with an **empty, real workspace** (migrations only), and
 2. ships a **clearly-labelled synthetic demo dataset** for evaluation, seeded through the same server functions as real data.
@@ -51,7 +51,7 @@ The specification was delivered as 24 thematic sections. Coverage is summarised 
 | OCR | **Partial** | English receipts and text-layer PDFs; **no Nepali OCR**, **no scanned-PDF rasteriser** |
 | Notifications / email | **Not built** | no SMTP provider or credentials |
 | Multi-currency / FX | **Not built** | NPR only, by design |
-| Multi-organisation | **Not built** | single `org_locus` workspace |
+| Multi-organisation | **Not built** | single `org_finance-tracker` workspace |
 | Native mobile app | **Not built** | responsive web UI only |
 
 ---
@@ -101,7 +101,7 @@ The specification was delivered as 24 thematic sections. Coverage is summarised 
 
 | Risk | Likelihood | Impact | Mitigation / status |
 |---|---|---|---|
-| Someone treats demo figures as real LOCUS finances | Medium | High | Synthetic flags, UI tags, seed/reset guards, docs |
+| Someone treats demo figures as real Finance Tracker finances | Medium | High | Synthetic flags, UI tags, seed/reset guards, docs |
 | Personal eSewa data leaks into the app | Low | High | Never imported; parser tested with synthetic fixtures |
 | PGlite file corruption / single-writer limits | Medium | High | Documented backup/restore; production requires managed Postgres |
 | No Nepali OCR → manual re-keying | High | Medium | Honest capability banner; manual review workflow |
@@ -115,4 +115,4 @@ The specification was delivered as 24 thematic sections. Coverage is summarised 
 
 ## 6. Conclusion
 
-The delivered system is a **working, tested, single-organisation finance application** with real persistence, enforced double-entry accounting, RBAC, document custody, reconciliation, and auditability. It is **not** a reconstruction of LOCUS’s actual history, because that history was not supplied. The remaining work is concentrated in production hardening (managed Postgres, Nepali OCR, notifications, historical import) and is tracked in `TASK_QUEUE.md`.
+The delivered system is a **working, tested, single-organisation finance application** with real persistence, enforced double-entry accounting, RBAC, document custody, reconciliation, and auditability. It is **not** a reconstruction of FINANCE TRACKER’s actual history, because that history was not supplied. The remaining work is concentrated in production hardening (managed Postgres, Nepali OCR, notifications, historical import) and is tracked in `TASK_QUEUE.md`.

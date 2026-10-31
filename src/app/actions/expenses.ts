@@ -77,7 +77,7 @@ export async function createExpenseAction(_prev: ActionResult, fd: FormData): Pr
         })(),
         eventId: optional(fd, "eventId"),
         departmentId: optional(fd, "departmentId"),
-        fundingSource: (str(fd, "fundingSource") || "PERSONAL") as "PERSONAL" | "LOCUS_CASH" | "LOCUS_BANK",
+        fundingSource: (str(fd, "fundingSource") || "PERSONAL") as "PERSONAL" | "FINANCE_TRACKER_CASH" | "FINANCE_TRACKER_BANK",
         paymentMethod: optional(fd, "paymentMethod"),
         invoiceNo: optional(fd, "invoiceNo"),
         sellerPan: optional(fd, "sellerPan"),

@@ -117,7 +117,7 @@ export default async function ReconstructionPage() {
       <PageHeader
         eyebrow="Historical reconstruction"
         title="Rebuild the past without inventing it"
-        sub="LOCUS’s earlier finances are reconstructed from evidence: statements, receipts, agreements and signed minutes. A blank field stays blank until a source supports it. This page shows what is actually known."
+        sub="FINANCE TRACKER’s earlier finances are reconstructed from evidence: statements, receipts, agreements and signed minutes. A blank field stays blank until a source supports it. This page shows what is actually known."
         actions={<Link className="btn" href="/import-export">Import & export</Link>}
       />
 
@@ -171,7 +171,7 @@ export default async function ReconstructionPage() {
               </div>
               <div className="attention">
                 <span className="icon-box badge-green"><Lock size={12} /></span>
-                <span><b>Personal wallet statement:</b> withheld on purpose. It belongs to an individual, not LOCUS, and its holder name and account number must not be imported or displayed.</span>
+                <span><b>Personal wallet statement:</b> withheld on purpose. It belongs to an individual, not FINANCE TRACKER, and its holder name and account number must not be imported or displayed.</span>
               </div>
               <div className="attention" style={{ borderBottom: 0 }}>
                 <span className="icon-box badge-blue"><History size={12} /></span>

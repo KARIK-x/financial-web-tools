@@ -160,7 +160,7 @@ export default async function MembersPage() {
                     <div className="field"><label className="label">Program</label><input name="program" /></div>
                     <div className="field"><label className="label">Batch</label><input name="batch" /></div>
                   </div>
-                  <div className="field"><label className="label">LOCUS role</label><input name="roleTitle" placeholder="e.g. Treasurer" /></div>
+                  <div className="field"><label className="label">FINANCE TRACKER role</label><input name="roleTitle" placeholder="e.g. Treasurer" /></div>
                   <div className="field"><label className="label">Notes</label><textarea name="notes" /></div>
                 </div>
               </ActionForm>

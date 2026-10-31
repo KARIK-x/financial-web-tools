@@ -25,7 +25,7 @@ export default async function LoginPage() {
     <>
       <section className="auth-art">
         <div>
-          <div className="auth-kicker">LOCUS · IOE Pulchowk Campus</div>
+          <div className="auth-kicker">FINANCE TRACKER · IOE Pulchowk Campus</div>
           <h2 className="auth-headline">
             Every rupee,
             <br />
@@ -55,13 +55,13 @@ export default async function LoginPage() {
         <div className="auth-card">
           <div className="eyebrow">Welcome back</div>
           <h1 className="page-title">Sign in</h1>
-          <p className="page-sub">Use the account issued by the LOCUS finance team.</p>
+          <p className="page-sub">Use the account issued by the Finance Tracker finance team.</p>
 
           <div style={{ marginTop: 24 }}>
             <ActionForm action={loginAction} submitLabel="Sign in" className="grid">
               <div className="field">
                 <label className="label" htmlFor="email">Email</label>
-                <input id="email" name="email" type="email" autoComplete="username" required placeholder="you@locus.org.np" />
+                <input id="email" name="email" type="email" autoComplete="username" required placeholder="you@finance-tracker.org.np" />
               </div>
               <div className="field">
                 <label className="label" htmlFor="password">Password</label>

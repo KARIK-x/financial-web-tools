@@ -107,15 +107,15 @@ export default async function NewExpensePage() {
                 </div>
                 <div className="field">
                   <label className="label" htmlFor="businessPurpose">Business purpose</label>
-                  <input id="businessPurpose" name="businessPurpose" maxLength={500} placeholder="Why LOCUS needed this" />
+                  <input id="businessPurpose" name="businessPurpose" maxLength={500} placeholder="Why FINANCE TRACKER needed this" />
                 </div>
 
                 <div className="field">
                   <label className="label">Who paid? <span className="req">*</span></label>
                   <select name="fundingSource" defaultValue="PERSONAL">
                     <option value="PERSONAL">I paid personally — reimburse me</option>
-                    <option value="LOCUS_CASH">Paid from LOCUS cash</option>
-                    <option value="LOCUS_BANK">Paid from LOCUS bank / wallet</option>
+                    <option value="FINANCE_TRACKER_CASH">Paid from FINANCE TRACKER cash</option>
+                    <option value="FINANCE_TRACKER_BANK">Paid from FINANCE TRACKER bank / wallet</option>
                   </select>
                   <span className="hint">Personal claims create a payable to your member record once approved.</span>
                 </div>

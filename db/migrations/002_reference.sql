@@ -1,6 +1,6 @@
 -- Reference data. Idempotent: safe to apply once via the migration runner.
 INSERT INTO organizations (id, name, legal_name, currency, fiscal_year_start_month, is_synthetic)
-VALUES ('org_locus', 'LOCUS', 'LOCUS — IOE Pulchowk Campus', 'NPR', 4, false)
+VALUES ('org_finance-tracker', 'FINANCE TRACKER', 'FINANCE TRACKER — IOE Pulchowk Campus', 'NPR', 4, false)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO permissions (key, description) VALUES
@@ -61,6 +61,6 @@ INSERT INTO settings (key, value) VALUES
   ('approval_thresholds', '{"standard":200000,"executive":2500000,"committee":10000000}'::jsonb),
   ('display', '{"numberGrouping":"lakh","dateCalendar":"AD","timezone":"Asia/Kathmandu"}'::jsonb),
   ('documentation', '{"missingReceiptRequiresDeclaration":true,"secondApprovalAbove":500000}'::jsonb),
-  ('compliance', '{"pan":null,"vatRegistered":false,"legalStatus":"UNVERIFIED","note":"LOCUS legal/tax status is unverified. Do not treat tax fields as obligations until confirmed by a Nepali accountant."}'::jsonb),
+  ('compliance', '{"pan":null,"vatRegistered":false,"legalStatus":"UNVERIFIED","note":"FINANCE TRACKER legal/tax status is unverified. Do not treat tax fields as obligations until confirmed by a Nepali accountant."}'::jsonb),
   ('reconstruction', '{"baselineVersion":0}'::jsonb)
 ON CONFLICT (key) DO NOTHING;

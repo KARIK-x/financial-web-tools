@@ -276,7 +276,7 @@ const createSchema = z.object({
   categoryId: z.string().optional().nullable(),
   eventId: z.string().optional().nullable(),
   departmentId: z.string().optional().nullable(),
-  fundingSource: z.enum(["PERSONAL", "LOCUS_CASH", "LOCUS_BANK"]),
+  fundingSource: z.enum(["PERSONAL", "FINANCE_TRACKER_CASH", "FINANCE_TRACKER_BANK"]),
   paymentMethod: z.string().trim().max(60).optional().nullable(),
   invoiceNo: z.string().trim().max(80).optional().nullable(),
   sellerPan: z.string().trim().max(20).optional().nullable(),

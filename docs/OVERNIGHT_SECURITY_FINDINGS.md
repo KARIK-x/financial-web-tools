@@ -3,7 +3,7 @@
 Date: 2026-10-24
 
 ## Scope
-Local authorized review of the LOCUS Finance application, its dependencies, authentication, authorization, uploads, exports, and backup scripts.
+Local authorized review of the Finance Tracker application, its dependencies, authentication, authorization, uploads, exports, and backup scripts.
 
 ## Method
 - Static inspection of server-side code and SQL usage.

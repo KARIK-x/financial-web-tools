@@ -115,7 +115,7 @@ describe("email configuration and outbox", () => {
 
 describe("password reset", () => {
   it("creates a hashed one-time token, queues mail, revokes sessions and consumes the token", async () => {
-    process.env.APP_URL = "https://locus.example.org";
+    process.env.APP_URL = "https://finance-tracker.example.org";
     const db = await createTestDb();
     try {
       const user = await createPerson(db, {

@@ -6,7 +6,7 @@
  * Safety rules:
  *  - Refuses to run if the database already contains any users or claims.
  *  - Every created row is flagged is_synthetic = true.
- *  - Demo identities use @locus.demo addresses and obviously synthetic names.
+ *  - Demo identities use @finance-tracker.demo addresses and obviously synthetic names.
  *  - Receipt images are generated locally and stamped "SYNTHETIC".
  *  - The shared demo password is written to .data/demo-credentials.txt (0600)
  *    and never printed to the terminal.
@@ -39,7 +39,7 @@ import { paisaToDecimal } from "../src/lib/money";
 import type { CurrentUser } from "../src/server/auth";
 import type { Permission, Role } from "../src/lib/permissions";
 
-const DEMO_DOMAIN = "locus.demo";
+const DEMO_DOMAIN = "finance-tracker.demo";
 const DEMO_PASSWORD = `${randomBytes(18).toString("base64url")}9a`;
 
 type DemoAccount = {
@@ -236,7 +236,7 @@ async function main() {
       `INSERT INTO events (id, name, code, starts_on, ends_on, owner_member_id, status, notes, is_synthetic)
        VALUES ($1,$2,'DEMO-HACK',$3,$4,$5,'ACTIVE',$6,true)`,
       [
-        hackathonId, "LOCUS Hackathon 2026 (Demo)", dateAt(40), dateAt(39), memberPerson.memberId,
+        hackathonId, "FINANCE TRACKER Hackathon 2026 (Demo)", dateAt(40), dateAt(39), memberPerson.memberId,
         "Synthetic demo event. Dates and figures are illustrative only.",
       ],
     );
@@ -311,7 +311,7 @@ async function main() {
 
     type ClaimSpec = {
       tag: string; owner: DemoAccount; date: string; vendor: string; description: string;
-      amount: string; categoryId: string; eventId: string | null; fundingSource: "PERSONAL" | "LOCUS_CASH" | "LOCUS_BANK";
+      amount: string; categoryId: string; eventId: string | null; fundingSource: "PERSONAL" | "FINANCE_TRACKER_CASH" | "FINANCE_TRACKER_BANK";
       receipt: boolean; declaration?: string; advanceId?: string | null; committeeRef?: string | null;
       submitNow?: boolean; paymentMethod?: string; purpose?: string;
     };
@@ -379,7 +379,7 @@ async function main() {
     await addClaim({
       tag: "C2", owner: people.events!, date: dateAt(42), vendor: "Demo Print House",
       description: "Banners, standees and participant badges",
-      amount: "3200", categoryId: "cat_printing", eventId: hackathonId, fundingSource: "LOCUS_BANK", receipt: true,
+      amount: "3200", categoryId: "cat_printing", eventId: hackathonId, fundingSource: "FINANCE_TRACKER_BANK", receipt: true,
       purpose: "Event branding and participant identification.",
     });
     // Awaiting first approval (executive tier).
@@ -412,7 +412,7 @@ async function main() {
     await addClaim({
       tag: "C7", owner: memberPerson, date: dateAt(33), vendor: "Demo Electronics",
       description: "Wi-Fi router and cables for the venue",
-      amount: "5000", categoryId: "cat_equipment", eventId: hackathonId, fundingSource: "LOCUS_CASH", receipt: true,
+      amount: "5000", categoryId: "cat_equipment", eventId: hackathonId, fundingSource: "FINANCE_TRACKER_CASH", receipt: true,
       advanceId: advance.id, purpose: "Temporary network equipment purchased from the cash float.",
     });
     // Draft, never submitted.
@@ -704,7 +704,7 @@ async function main() {
     await fs.writeFile(
       credentialFile,
       [
-        "LOCUS Finance — SYNTHETIC demo credentials",
+        "Finance Tracker — SYNTHETIC demo credentials",
         "===========================================",
         "",
         "This database contains synthetic demonstration data only.",

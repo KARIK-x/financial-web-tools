@@ -29,7 +29,7 @@ Credentials and environment files must be restored from a secret manager, not fr
 
 1. **Stop the application.** PGlite is embedded and single-process. Copying a live data directory can produce an inconsistent snapshot.
 2. Confirm no `npm run dev` / `npm start` process is using the same `DATABASE_DIR`.
-3. Decide the destination. Keep it outside the repository (for example `/Users/ashim/locus-backups/...`), on a private volume with restricted permissions.
+3. Decide the destination. Keep it outside the repository (for example `/Users/ashim/finance-tracker-backups/...`), on a private volume with restricted permissions.
 
 The scripts warn if the application may still be running, but they cannot guarantee consistency. The operator must stop it.
 
@@ -38,8 +38,8 @@ The scripts warn if the application may still be running, but they cannot guaran
 ## 3. Create a backup
 
 ```bash
-cd "/Users/ashim/Downloads/LOCUS FINANCE AUTOMATION"
-npm run db:backup -- --out /secure/locus-backups/$(date +%Y%m%d-%H%M%S)
+cd "/Users/ashim/Downloads/FINANCE TRACKER AUTOMATION"
+npm run db:backup -- --out /secure/finance-tracker-backups/$(date +%Y%m%d-%H%M%S)
 ```
 
 Optional paths:
@@ -48,7 +48,7 @@ Optional paths:
 npm run db:backup -- \
   --database-dir .data/pglite \
   --document-dir .data/documents \
-  --out /secure/locus-backups/20261024
+  --out /secure/finance-tracker-backups/20261024
 ```
 
 Output includes:
@@ -66,7 +66,7 @@ The backup is private (`0700` directories, `0600` files).
 ## 4. Verify a backup (before relying on it)
 
 ```bash
-npm run db:verify-backup -- --from /secure/locus-backups/20261024
+npm run db:verify-backup -- --from /secure/finance-tracker-backups/20261024
 ```
 
 A healthy result:
@@ -97,9 +97,9 @@ The verifier checks:
 Never restore over live data as the first test. Use a scratch directory:
 
 ```bash
-SCRATCH=$(mktemp -d /tmp/locus-restore.XXXXXX)
+SCRATCH=$(mktemp -d /tmp/finance-tracker-restore.XXXXXX)
 npm run db:restore -- \
-  --from /secure/locus-backups/20261024 \
+  --from /secure/finance-tracker-backups/20261024 \
   --database-dir "$SCRATCH/pglite" \
   --document-dir "$SCRATCH/documents"
 ```
@@ -120,7 +120,7 @@ Then verify the restored data:
 npx tsx scripts/verify-restored.ts \
   --database-dir "$SCRATCH/pglite" \
   --document-dir "$SCRATCH/documents" \
-  --from /secure/locus-backups/20261024
+  --from /secure/finance-tracker-backups/20261024
 ```
 
 Expected:
@@ -148,7 +148,7 @@ Do not point the production app at the scratch directory.
 
 | Step | Result |
 |---|---|
-| Backup created at `/Users/ashim/locus-backups/20261024-160509-final-drill` | **TESTED-PASS** |
+| Backup created at `/Users/ashim/finance-tracker-backups/20261024-160509-final-drill` | **TESTED-PASS** |
 | `npm run db:verify-backup -- --from …` | **`VERIFIED`** |
 | Restore to disposable temp directory | **TESTED-PASS** |
 | `verify-restored.ts` | **`RESTORED DATABASE VERIFIED`** |
@@ -173,7 +173,7 @@ Only when you intentionally replace the live database:
 
 ```bash
 npm run db:restore -- \
-  --from /secure/locus-backups/20261024 \
+  --from /secure/finance-tracker-backups/20261024 \
   --database-dir .data/pglite \
   --document-dir .data/documents \
   --force
@@ -205,7 +205,7 @@ npm run db:restore -- \
 
 1. **Schedule** a daily backup during a maintenance window; stop or quiesce writes.
 2. **Encrypt** the backup at rest and in transit; store off-device.
-3. **Retain** daily/weekly/monthly copies per LOCUS policy.
+3. **Retain** daily/weekly/monthly copies per FINANCE TRACKER policy.
 4. **Verify** every backup automatically (`db:verify-backup`).
 5. **Drill** a restore quarterly into a disposable environment, with a signed checklist.
 6. **Record** the operator, date, backup path, verification result, and any warnings.
@@ -243,10 +243,10 @@ A scheduler is not built into the application. Use the operating-system schedule
 
 ```bash
 # Daily backup at 02:00
-0 2 * * * cd /path/to/locus-finance && npm run db:backup
+0 2 * * * cd /path/to/finance-tracker && npm run db:backup
 
 # Weekly retention cleanup, keeping 30 days
-0 3 * * 0 cd /path/to/locus-finance && npm run backups:retention -- --days=30 --apply --confirm=DELETE-OLD-BACKUPS
+0 3 * * 0 cd /path/to/finance-tracker && npm run backups:retention -- --days=30 --apply --confirm=DELETE-OLD-BACKUPS
 ```
 
 Off-site copies must be encrypted before leaving the host. The backup manifest intentionally excludes credentials and environment files; restore them from the secret manager.

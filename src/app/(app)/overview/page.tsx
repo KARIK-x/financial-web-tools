@@ -91,7 +91,7 @@ export default async function OverviewPage() {
       {allSynthetic ? (
         <div className="warn-box" style={{ marginBottom: 18 }}>
           <b>This workspace currently contains only synthetic demo records.</b> They exist so the workflows can be
-          tested end to end. Do not treat any amount below as a real LOCUS balance. Clear them with
+          tested end to end. Do not treat any amount below as a real FINANCE TRACKER balance. Clear them with
           <code> npm run db:reset-demo</code> before entering real data.
         </div>
       ) : !hasRealClaims ? (

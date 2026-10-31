@@ -5,7 +5,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { PGlite } from "@electric-sql/pglite";
 
-export const BACKUP_FORMAT = "locus-backup-v1";
+export const BACKUP_FORMAT = "finance-tracker-backup-v1";
 
 export type BackupManifest = {
   format: string;
@@ -203,7 +203,7 @@ export async function createBackup(input: {
   await fs.writeFile(
     path.join(outDir, "README.txt"),
     [
-      "LOCUS backup",
+      "FINANCE TRACKER backup",
       `Created: ${manifest.createdAt}`,
       `Git commit: ${manifest.gitCommit ?? "unknown"}`,
       "",
@@ -229,7 +229,7 @@ export async function verifyBackup(backupDir: string): Promise<VerifyResult> {
   const errors: string[] = [];
   const warnings: string[] = [];
   let manifest: BackupManifest | null = null;
-  const temp = await fs.mkdtemp(path.join(os.tmpdir(), "locus-verify-"));
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), "finance-tracker-verify-"));
   try {
     try {
       manifest = JSON.parse(await fs.readFile(path.join(root, "manifest.json"), "utf8")) as BackupManifest;

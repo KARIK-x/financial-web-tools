@@ -155,7 +155,7 @@ export default async function SponsorDetailPage({ params }: { params: Promise<{ 
                       <div className="field"><label className="label" htmlFor="notes">Notes</label><input id="notes" name="notes" /></div>
                     </ActionForm>
                     <div className="tiny muted" style={{ marginTop: 6 }}>
-                      Only record money that actually reached the selected LOCUS account. This posts sponsorship income
+                      Only record money that actually reached the selected FINANCE TRACKER account. This posts sponsorship income
                       and cannot be silently deleted afterwards.
                     </div>
                   </div>

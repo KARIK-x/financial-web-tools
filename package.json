@@ -1,8 +1,8 @@
 {
-  "name": "locus-finance",
+  "name": "finance-tracker",
   "version": "0.1.0",
   "private": true,
-  "description": "LOCUS Finance Intelligence Platform",
+  "description": "Finance Tracker Intelligence Platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

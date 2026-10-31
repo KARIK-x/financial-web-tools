@@ -38,7 +38,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <div className="main">
         <header className="app-topbar no-print">
           <div className="app-topbar-left">
-            <span className="app-topbar-kicker">LOCUS Finance</span>
+            <span className="app-topbar-kicker">Finance Tracker</span>
             <span className="app-topbar-title">Operations console</span>
           </div>
           <div className="app-topbar-right">

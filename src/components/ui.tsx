@@ -196,7 +196,7 @@ export function ProgressBar({ value, label }: { value: number; label?: string })
 }
 
 export function SourceTag({ sourceType, synthetic }: { sourceType?: string | null; synthetic?: boolean }) {
-  if (synthetic) return <span className="src" title="Generated demo data — not a real LOCUS record">Synthetic</span>;
+  if (synthetic) return <span className="src" title="Generated demo data — not a real FINANCE TRACKER record">Synthetic</span>;
   if (sourceType === "HISTORICAL_IMPORT") return <span className="src">Imported</span>;
   if (sourceType === "OCR_CANDIDATE") return <span className="src">OCR candidate</span>;
   return null;

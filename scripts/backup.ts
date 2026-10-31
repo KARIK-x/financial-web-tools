@@ -10,7 +10,7 @@ async function main() {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const databaseDir = arg("database-dir") ?? process.env.DATABASE_DIR ?? path.join(process.cwd(), ".data", "pglite");
   const documentDir = arg("document-dir") ?? process.env.DOCUMENT_DIR ?? path.join(process.cwd(), ".data", "documents");
-  const outDir = arg("out") ?? path.join(process.cwd(), "backups", `locus-${stamp}`);
+  const outDir = arg("out") ?? path.join(process.cwd(), "backups", `finance-tracker-${stamp}`);
   const manifest = await createBackup({ databaseDir, documentDir, outDir });
   console.log(`Backup written to ${outDir}`);
   console.log(`  Git commit: ${manifest.gitCommit ?? "unknown"}`);

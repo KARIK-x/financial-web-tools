@@ -16,7 +16,7 @@ suite("managed PostgreSQL adapter", () => {
 
   beforeAll(async () => {
     if (!adminUrl) return;
-    databaseName = `locus_test_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+    databaseName = `finance_tracker_test_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
     admin = new Client({ connectionString: adminUrl });
     await admin.connect();
     await admin.query(`CREATE DATABASE "${databaseName}"`);

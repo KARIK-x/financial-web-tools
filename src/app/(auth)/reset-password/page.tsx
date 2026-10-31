@@ -11,7 +11,7 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
     <>
       <section className="auth-art">
         <div>
-          <div className="auth-kicker">LOCUS · IOE Pulchowk Campus</div>
+          <div className="auth-kicker">FINANCE TRACKER · IOE Pulchowk Campus</div>
           <h2 className="auth-headline">
             Set a new password.
             <br />

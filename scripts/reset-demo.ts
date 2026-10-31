@@ -18,7 +18,7 @@ import { createDatabase, databaseConfigFromEnv, one } from "../src/server/db";
 import { recordAudit } from "../src/server/audit";
 import { DOCUMENT_ROOT } from "../src/server/storage";
 
-const DEMO_EMAIL_DOMAIN = "@locus.demo";
+const DEMO_EMAIL_DOMAIN = "@finance-tracker.demo";
 
 async function main() {
   const db = await createDatabase(databaseConfigFromEnv());
@@ -139,7 +139,7 @@ async function main() {
         ('approval_thresholds', '{"standard":200000,"executive":2500000,"committee":10000000}'::jsonb),
         ('display', '{"numberGrouping":"lakh","dateCalendar":"AD","timezone":"Asia/Kathmandu"}'::jsonb),
         ('documentation', '{"missingReceiptRequiresDeclaration":true,"secondApprovalAbove":500000}'::jsonb),
-        ('compliance', '{"pan":null,"vatRegistered":false,"legalStatus":"UNVERIFIED","note":"LOCUS legal/tax status is unverified. Do not treat tax fields as obligations until confirmed by a Nepali accountant."}'::jsonb),
+        ('compliance', '{"pan":null,"vatRegistered":false,"legalStatus":"UNVERIFIED","note":"FINANCE TRACKER legal/tax status is unverified. Do not treat tax fields as obligations until confirmed by a Nepali accountant."}'::jsonb),
         ('reconstruction', '{"baselineVersion":0}'::jsonb)
       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = NULL;
 

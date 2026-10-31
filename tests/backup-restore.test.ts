@@ -13,7 +13,7 @@ import { createBackup, restoreBackup, verifyBackup } from "../scripts/lib/backup
 const roots: string[] = [];
 
 async function tempRoot(): Promise<string> {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "locus-backup-test-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "finance-tracker-backup-test-"));
   roots.push(root);
   return root;
 }

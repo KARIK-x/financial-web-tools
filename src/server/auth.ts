@@ -7,7 +7,7 @@ import { getDb, one, type Db } from "./db";
 import { generateSessionToken, hashToken, verifyPassword } from "./password";
 import { can, ROLE_LABELS, type Permission, type Role } from "@/lib/permissions";
 
-export const SESSION_COOKIE = "locus_session";
+export const SESSION_COOKIE = "finance_tracker_session";
 
 export type CurrentUser = {
   id: string;

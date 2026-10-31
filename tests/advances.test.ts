@@ -66,7 +66,7 @@ describe("advances", () => {
       description: "Venue deposit paid from advance",
       amount: "3,000",
       categoryId: "cat_venue",
-      fundingSource: "LOCUS_CASH",
+      fundingSource: "FINANCE_TRACKER_CASH",
       advanceId,
       missingReceiptDeclaration: "Receipt pending from venue office.",
       submitNow: true,

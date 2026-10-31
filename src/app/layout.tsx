@@ -6,8 +6,8 @@ const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakart
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "LOCUS Finance",
-  description: "LOCUS Finance Intelligence Platform",
+  title: "Finance Tracker",
+  description: "Finance Tracker Intelligence Platform",
   robots: { index: false, follow: false },
 };
 
@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${jakarta.variable} ${fraunces.variable}`}>
       <body>
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('locus-theme');document.documentElement.setAttribute('data-theme', t==='dark' ? 'dark' : 'light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();` }} />
+      <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('finance-tracker-theme');document.documentElement.setAttribute('data-theme', t==='dark' ? 'dark' : 'light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();` }} />
       <main id="main-content" role="main">{children}</main>
     </body>
     </html>

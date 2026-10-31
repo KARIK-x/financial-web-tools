@@ -108,7 +108,7 @@ export function Sidebar({
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <span className="brand-mark" style={{ width: 26, height: 26, fontSize: 15, background: "#0d5c4a", color: "#fff" }}>L</span>
-          <span style={{ fontWeight: 600, letterSpacing: "0.02em" }}>LOCUS Finance</span>
+          <span style={{ fontWeight: 600, letterSpacing: "0.02em" }}>Finance Tracker</span>
         </div>
       </div>
       {open ? <div className="scrim no-print" onClick={() => setOpen(false)} /> : null}
@@ -116,7 +116,7 @@ export function Sidebar({
         <div className="sidebar-brand">
           <span className="brand-mark">L</span>
           <div style={{ flex: 1 }}>
-            <div className="brand-name">LOCUS</div>
+            <div className="brand-name">FINANCE TRACKER</div>
             <div className="brand-sub">Finance Intelligence</div>
           </div>
           <button className="btn btn-ghost btn-icon" style={{ color: "#9aa1ac", display: open ? "inline-flex" : "none" }} onClick={() => setOpen(false)} aria-label="Close navigation">

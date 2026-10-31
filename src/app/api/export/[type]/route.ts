@@ -80,7 +80,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ type
       return new Response(JSON.stringify(body, null, 2), {
         headers: {
           "Content-Type": "application/json; charset=utf-8",
-          "Content-Disposition": `attachment; filename="locus-${type}-${stamp}.json"`,
+          "Content-Disposition": `attachment; filename="finance-tracker-${type}-${stamp}.json"`,
           "Cache-Control": "no-store",
           "X-Content-Type-Options": "nosniff",
         },
@@ -99,7 +99,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ type
       return new Response(buffer, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": `attachment; filename="locus-${type}-${stamp}.xlsx"`,
+          "Content-Disposition": `attachment; filename="finance-tracker-${type}-${stamp}.xlsx"`,
           "Cache-Control": "no-store",
           "X-Content-Type-Options": "nosniff",
         },
@@ -113,7 +113,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ type
       const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       const margin = 40;
       let y = 555;
-      page.drawText(`LOCUS Finance — ${type} export`, { x: margin, y, size: 16, font: bold, color: rgb(0.04, 0.04, 0.04) });
+      page.drawText(`Finance Tracker — ${type} export`, { x: margin, y, size: 16, font: bold, color: rgb(0.04, 0.04, 0.04) });
       y -= 20;
       page.drawText(`Period: ${period.from} to ${period.to} · Rows: ${result.records.length}${result.truncated ? " (truncated)" : ""}`, { x: margin, y, size: 10, font, color: rgb(0.35, 0.35, 0.35) });
       y -= 24;
@@ -135,7 +135,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ type
       return new Response(Buffer.from(bytes), {
         headers: {
           "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="locus-${type}-${stamp}.pdf"`,
+          "Content-Disposition": `attachment; filename="finance-tracker-${type}-${stamp}.pdf"`,
           "Cache-Control": "no-store",
           "X-Content-Type-Options": "nosniff",
         },
@@ -145,7 +145,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ type
     return new Response(toCsv(result.headers, result.records), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="locus-${type}-${stamp}.csv"`,
+        "Content-Disposition": `attachment; filename="finance-tracker-${type}-${stamp}.csv"`,
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
       },

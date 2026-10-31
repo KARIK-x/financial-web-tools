@@ -1,23 +1,23 @@
-# LOCUS Finance Intelligence Platform — Executive Summary
+# Finance Tracker Intelligence Platform — Executive Summary
 
 **Date:** 2026-10-24 · **Status:** Research phase complete. No implementation started.
 
 ## 1. The Core Problem
 
-LOCUS (engineering student organization, IOE Pulchowk Campus, Nepal) lacks a system of financial visibility. The evidence-based problem statements from the brief — expenses made by many members, scattered/non-digitized receipts, unreconciled personal spending, unclear cash advances, unknown historical expenditure, and continuity loss when committees change — describe a classic **absence of a single source of financial truth**, not a lack of accounting knowledge.
+FINANCE TRACKER (engineering student organization, IOE Pulchowk Campus, Nepal) lacks a system of financial visibility. The evidence-based problem statements from the brief — expenses made by many members, scattered/non-digitized receipts, unreconciled personal spending, unclear cash advances, unknown historical expenditure, and continuity loss when committees change — describe a classic **absence of a single source of financial truth**, not a lack of accounting knowledge.
 
-The consequence is that the Finance Manager cannot currently answer, with confidence: *How much has LOCUS spent? Who spent it? On what? What is owed to members? What have sponsors actually paid? What cash do we actually have?*
+The consequence is that the Finance Manager cannot currently answer, with confidence: *How much has FINANCE TRACKER spent? Who spent it? On what? What is owed to members? What have sponsors actually paid? What cash do we actually have?*
 
 ## 2. Proposed Solution
 
-A **custom, web-based financial management platform** built specifically for LOCUS's reality: multi-member spending, event-based finance, sponsorship revenue, NPR-only cash operations, poor historical records, and low operating budget.
+A **custom, web-based financial management platform** built specifically for Finance Tracker's reality: multi-member spending, event-based finance, sponsorship revenue, NPR-only cash operations, poor historical records, and low operating budget.
 
 **Recommendation: Build custom, do not adopt Zoho Expense/Expensify/SAP Concur.**
 
 Why not adopt:
 - Commercial tools are priced per-user/per-month for corporate budgets; a 100–300 member student organization faces real recurring cost (or restrictive free tiers).
-- They assume corporate-card feeds, corporate tax regimes (IRS/GST mileage rules), and payroll reimbursement rails that do not exist for LOCUS.
-- They provide **no historical-reconstruction capability** — the single most valuable thing LOCUS needs right now. Their data model starts clean from day one; LOCUS's starts dirty from year zero.
+- They assume corporate-card feeds, corporate tax regimes (IRS/GST mileage rules), and payroll reimbursement rails that do not exist for FINANCE TRACKER.
+- They provide **no historical-reconstruction capability** — the single most valuable thing FINANCE TRACKER needs right now. Their data model starts clean from day one; Finance Tracker's starts dirty from year zero.
 - Data portability and institutional continuity are weaker when the org's entire financial history lives in a vendor SaaS account owned by a graduating committee member.
 
 Hybrid possibility (rejected for v1 but re-evaluable at Phase 4): Zoho Expense free tier for live expense capture while building the custom platform. Rejected because it duplicates member onboarding effort and splits the financial record across two systems during exactly the period when the record must be unified.
@@ -30,7 +30,7 @@ Hybrid possibility (rejected for v1 but re-evaluable at Phase 4): Zoho Expense f
 4. **Local-first OCR strategy:** PaddleOCR PP-OCRv5 (free, self-hosted, includes a Devanagari model covering Nepali + English) as the primary engine for the historical backlog; optional cloud OCR (Google Document AI Invoice Parser, ~$0.10 per document up to 10 pages) only for low-quality failures, with explicit Finance Manager authorization because receipts leave the premises.
 5. **Hosted Postgres backend (Supabase Pro, ~$25/month)** with Next.js frontend, and local OCR workers. Total estimated operating cost: **$25–40/month**, well within student-org budget.
 6. **Trustworthy-by-design reporting:** every number traces to transactions; every transaction carries a verification state; the dashboard shows verified vs claimed amounts side by side, never blended.
-7. **Configurable Nepal compliance layer**, not hardcoded rules: PAN/VAT fields optional, BS/AD dual dates, NPR formatting, because LOCUS's exact legal/institutional status is **unverified** (see 04 and 12).
+7. **Configurable Nepal compliance layer**, not hardcoded rules: PAN/VAT fields optional, BS/AD dual dates, NPR formatting, because Finance Tracker's exact legal/institutional status is **unverified** (see 04 and 12).
 
 ## 4. Key Risks
 

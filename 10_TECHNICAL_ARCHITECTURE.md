@@ -22,7 +22,7 @@
 
 | Alternative | Verdict |
 |---|---|
-| **Full self-host on VPS** (Postgres+MinIO+Caddy, $5–10/mo) | Cheapest but LOCUS has no sysadmin; backups/patching become someone's unpaid job → rejected for v1, revisit if costs matter in year 3 |
+| **Full self-host on VPS** (Postgres+MinIO+Caddy, $5–10/mo) | Cheapest but FINANCE TRACKER has no sysadmin; backups/patching become someone's unpaid job → rejected for v1, revisit if costs matter in year 3 |
 | **Firebase** | NoSQL hurts relational financial integrity; per-op pricing surprises; egress pricier (metacto.com comparison 2026-05) → rejected |
 | **Neon/Xata + separate auth/storage** | ~$14–26/mo for DB alone; adding Auth+Storage+CDN approaches Supabase price with more assembly (makerkit.dev 2026-06) → viable fallback, not better |
 | **Django monolith instead of Next+FastAPI** | Reasonable; rejected only because Next.js+Supabase gets auth/storage/RLS for near-zero work and the OCR worker still needs Python anyway → hybrid above |

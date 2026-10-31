@@ -111,27 +111,27 @@ export async function createDatabase(opts: {
   return db;
 }
 
-const globalForDb = globalThis as unknown as { __locusDb?: Promise<Db> };
+const globalForDb = globalThis as unknown as { __financeTrackerDb?: Promise<Db> };
 
 export function getDb(): Promise<Db> {
-  if (!globalForDb.__locusDb) {
+  if (!globalForDb.__financeTrackerDb) {
     const config = databaseConfigFromEnv();
     if (!config.connectionString && config.dataDir) {
-      globalForDb.__locusDb = fs
+      globalForDb.__financeTrackerDb = fs
         .mkdir(config.dataDir, { recursive: true })
         .then(() => createDatabase(config))
         .catch((err) => {
-          globalForDb.__locusDb = undefined;
+          globalForDb.__financeTrackerDb = undefined;
           throw err;
         });
     } else {
-      globalForDb.__locusDb = createDatabase(config).catch((err) => {
-        globalForDb.__locusDb = undefined;
+      globalForDb.__financeTrackerDb = createDatabase(config).catch((err) => {
+        globalForDb.__financeTrackerDb = undefined;
         throw err;
       });
     }
   }
-  return globalForDb.__locusDb;
+  return globalForDb.__financeTrackerDb;
 }
 
 export async function one<T>(db: Executor, sql: string, params: unknown[] = []): Promise<T | null> {

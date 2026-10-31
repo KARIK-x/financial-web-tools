@@ -43,7 +43,7 @@ function parseCsv(bytes: Buffer): { header: string[]; rows: CsvRow[] } {
   return { header, rows };
 }
 
-const FUNDING = new Set(["PERSONAL", "LOCUS_CASH", "LOCUS_BANK"]);
+const FUNDING = new Set(["PERSONAL", "FINANCE_TRACKER_CASH", "FINANCE_TRACKER_BANK"]);
 const DOCUMENTATION = new Set(["MISSING", "PARTIAL", "COMPLETE"]);
 
 function get(row: CsvRow, names: string[]): string {
@@ -128,7 +128,7 @@ export async function previewHistoricalClaimsCsv(
       const claimNo = get(row, optionalAliases.claim_no!);
       const eventValue = get(row, optionalAliases.event!);
       const fundingRaw = get(row, optionalAliases.funding_source!).toUpperCase() || "PERSONAL";
-      const funding = fundingRaw === "LOCUS_BANK" ? "LOCUS_BANK" : fundingRaw === "LOCUS_CASH" ? "LOCUS_CASH" : "PERSONAL";
+      const funding = fundingRaw === "FINANCE_TRACKER_BANK" ? "FINANCE_TRACKER_BANK" : fundingRaw === "FINANCE_TRACKER_CASH" ? "FINANCE_TRACKER_CASH" : "PERSONAL";
       const documentation = get(row, optionalAliases.documentation_status!).toUpperCase() || "MISSING";
       const declaration = get(row, optionalAliases.missing_receipt_declaration!) || null;
       const documentationState = documentation === "COMPLETE" ? "COMPLETE" : (declaration ? "MISSING_DECLARED" : "MISSING_UNDECLARED");

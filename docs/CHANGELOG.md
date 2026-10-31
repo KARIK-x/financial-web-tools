@@ -1,12 +1,12 @@
 # CHANGELOG
 
-All notable changes to the LOCUS Finance Intelligence Platform. Dates are AD (ISO). Money is NPR unless stated.
+All notable changes to the Finance Tracker Intelligence Platform. Dates are AD (ISO). Money is NPR unless stated.
 
 ---
 
 ## [Unreleased] — 2026-10-24 hardening
 
-Forensic verification and hardening pass. No real LOCUS data was supplied or imported; all financial data remains synthetic.
+Forensic verification and hardening pass. No real FINANCE TRACKER data was supplied or imported; all financial data remains synthetic.
 
 ### Added
 - Migration `003_operational_hardening.sql`: durable `rate_limits`, `accounting_periods`, `accounting_period_events`, MFA columns, OCR page/language columns.

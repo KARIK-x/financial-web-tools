@@ -65,7 +65,7 @@ export class PgDatabase implements Db {
       connectionTimeoutMillis: positiveInt(process.env.DATABASE_CONNECT_TIMEOUT_MS, 10_000),
       statement_timeout: positiveInt(process.env.DATABASE_STATEMENT_TIMEOUT_MS, 30_000),
       query_timeout: positiveInt(process.env.DATABASE_QUERY_TIMEOUT_MS, 30_000),
-      application_name: process.env.DATABASE_APPLICATION_NAME ?? "locus-finance",
+      application_name: process.env.DATABASE_APPLICATION_NAME ?? "finance-tracker",
       options: "-c timezone=Asia/Kathmandu",
       ssl: sslConfig(connectionString),
     });

@@ -54,7 +54,7 @@ export default async function SetupPage() {
             <div className="auth-point"><span className="tick">✓</span><span><b>Back up after setup.</b> The database and document store live under <code>.data/</code>.</span></div>
           </div>
         </div>
-        <div className="auth-kicker">LOCUS Finance Intelligence Platform</div>
+        <div className="auth-kicker">Finance Tracker Intelligence Platform</div>
       </section>
 
       <section className="auth-form-wrap">
@@ -71,7 +71,7 @@ export default async function SetupPage() {
               </div>
               <div className="field">
                 <label className="label" htmlFor="email">Email <span className="req">*</span></label>
-                <input id="email" name="email" type="email" required autoComplete="username" placeholder="finance@locus.org.np" />
+                <input id="email" name="email" type="email" required autoComplete="username" placeholder="finance@finance-tracker.org.np" />
               </div>
               <div className="field">
                 <label className="label" htmlFor="memberName">Member record name</label>

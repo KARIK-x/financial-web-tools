@@ -5,7 +5,7 @@ import { extractDocumentText, ocrCapability, runExtraction } from "@/server/ocr"
 async function receiptPng(): Promise<Buffer> {
   const svg = `<svg width="760" height="320" xmlns="http://www.w3.org/2000/svg">
     <rect width="100%" height="100%" fill="white"/>
-    <text x="30" y="80" font-family="Arial" font-size="40" fill="black">LOCUS TEST RECEIPT</text>
+    <text x="30" y="80" font-family="Arial" font-size="40" fill="black">FINANCE TRACKER TEST RECEIPT</text>
     <text x="30" y="160" font-family="Arial" font-size="36" fill="black">TOTAL NPR 5,000.00</text>
     <text x="30" y="235" font-family="Arial" font-size="32" fill="black">DATE 2026-10-20</text>
   </svg>`;

@@ -94,7 +94,7 @@ describe("sole administrator break-glass MFA", () => {
 describe("orphan document cleanup", () => {
   it("reports and deletes only files with no document row, after a grace period", async () => {
     const db = await createTestDb();
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "locus-orphans-"));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "finance-tracker-orphans-"));
     try {
       const referenced = "aa/bb/referenced.png";
       const orphan = "cc/dd/orphan.png";

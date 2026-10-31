@@ -221,7 +221,7 @@ export default async function ReconciliationPage({
                         ) : null}
                         {line.match_status !== "MATCHED" && line.match_status !== "IGNORED" ? (
                           <div style={{ marginTop: 5 }}>
-                            <QuickAction action={confirmMatchAction} label="Ignore line" className="btn btn-xs btn-ghost" fields={{ lineId: line.id }} confirm="Ignore this line? Use this for bank charges already recorded elsewhere or lines outside LOCUS." />
+                            <QuickAction action={confirmMatchAction} label="Ignore line" className="btn btn-xs btn-ghost" fields={{ lineId: line.id }} confirm="Ignore this line? Use this for bank charges already recorded elsewhere or lines outside FINANCE TRACKER." />
                           </div>
                         ) : null}
                       </td>

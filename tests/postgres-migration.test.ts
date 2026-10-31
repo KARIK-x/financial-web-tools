@@ -22,7 +22,7 @@ suite("PGlite to PostgreSQL data migration", () => {
 
   beforeAll(async () => {
     if (!adminUrl) return;
-    sourceDir = await fs.mkdtemp(path.join(os.tmpdir(), "locus-migration-source-"));
+    sourceDir = await fs.mkdtemp(path.join(os.tmpdir(), "finance-tracker-migration-source-"));
     const source = await createDatabase({ dataDir: sourceDir });
     const member = await createPerson(source, { role: "MEMBER", name: "Migration Member", synthetic: true });
     const finance = await createPerson(source, { role: "FINANCE", name: "Migration Finance", synthetic: true });
@@ -53,7 +53,7 @@ suite("PGlite to PostgreSQL data migration", () => {
     });
     await source.close();
 
-    targetName = `locus_migration_${randomUUID().replace(/-/g, "").slice(0, 14)}`;
+    targetName = `finance_tracker_migration_${randomUUID().replace(/-/g, "").slice(0, 14)}`;
     admin = new Client({ connectionString: adminUrl });
     await admin.connect();
     await admin.query(`CREATE DATABASE "${targetName}"`);

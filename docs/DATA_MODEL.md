@@ -4,7 +4,7 @@
 **Migrations:** `db/migrations/001_init.sql` (schema + triggers), `db/migrations/002_reference.sql` (reference data, categories, role permissions, settings), `db/migrations/003_operational_hardening.sql` (durable rate limits, accounting periods, MFA, OCR page provenance)
 **Tables:** 39 (including `schema_migrations` and staging tables)
 
-All money columns are `BIGINT` **paisa**. All timestamps are `timestamptz`. Business dates are `DATE` with an explicit `calendar` (`AD`/`BS`) where a human-entered date is involved. Identifiers are text UUIDs or stable slugs (`org_locus`, `cat_food`).
+All money columns are `BIGINT` **paisa**. All timestamps are `timestamptz`. Business dates are `DATE` with an explicit `calendar` (`AD`/`BS`) where a human-entered date is involved. Identifiers are text UUIDs or stable slugs (`org_finance-tracker`, `cat_food`).
 
 ---
 
@@ -44,7 +44,7 @@ Roles: `ADMIN`, `FINANCE`, `EXECUTIVE`, `EVENT_HEAD`, `MEMBER`, `AUDITOR`.
 ### `expense_claims` highlights
 - `claim_no` unique, format `LOC-YYYY-NNNN`.
 - `amount_paisa > 0` enforced.
-- `funding_source ∈ {PERSONAL, LOCUS_CASH, LOCUS_BANK}`; `reimbursement_required` drives the payable account.
+- `funding_source ∈ {PERSONAL, FINANCE_TRACKER_CASH, FINANCE_TRACKER_BANK}`; `reimbursement_required` drives the payable account.
 - `status` is a 12-value CHECK constraint.
 - `verification_state ∈ {UNVERIFIED, VERIFIED, DISPUTED}`.
 - `documentation_state ∈ {COMPLETE, MISSING_DECLARED, MISSING_UNDECLARED}`.
@@ -82,7 +82,7 @@ Document statuses include `UPLOADED`, `EXTRACTED`, `NEEDS_REVIEW`, `REVIEWED`, `
 |---|---|
 | `sponsors` | Sponsor identity, normalised name |
 | `sponsorship_agreements` | Pledge: `promised_paisa`, `state`, dates, benefits |
-| `sponsor_deliverables` | What LOCUS owes the sponsor, with due date/status |
+| `sponsor_deliverables` | What FINANCE TRACKER owes the sponsor, with due date/status |
 
 Agreement states: `PLEDGED`, `PARTIALLY_RECEIVED`, `RECEIVED`, `DELIVERABLES_PENDING`, `CLOSED`. Receipts are `payments` rows of type `SPONSOR_RECEIPT` linked by `agreement_id`.
 

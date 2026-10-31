@@ -39,7 +39,7 @@ afterAll(async () => {
 
 describe("MFA", () => {
   it("round-trips base32 and verifies a TOTP code once, rejecting replay", async () => {
-    const raw = Buffer.from("locus-test-secret-20b");
+    const raw = Buffer.from("finance-tracker-test-secret-20b");
     expect(base32Decode(base32Encode(raw)).equals(raw)).toBe(true);
     const secret = generateTotpSecret();
     const step = Math.floor(Date.now() / 1000 / 30);
@@ -149,7 +149,7 @@ describe("accounting period lock", () => {
 
 describe("durable rate limiting", () => {
   it("persists counters across a database reopen and clears only when asked", async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "locus-rate-limit-"));
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "finance-tracker-rate-limit-"));
     try {
       const first = await createDatabase({ dataDir: dir });
       expect((await consumeRateLimit(first, "test:key", 2, 60)).allowed).toBe(true);

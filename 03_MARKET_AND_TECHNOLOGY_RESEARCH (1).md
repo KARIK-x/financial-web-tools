@@ -6,20 +6,20 @@
 
 ### Zoho Expense
 - Strengths verified: Autoscan OCR with line-item extraction, autoscan accepts JPG/PNG and PDF/DOC/XLS via upload, custom approval statuses, receipt-declaration (lost-receipt affidavit) feature, mobile approvals, per-transaction history/audit trail, multi-currency, vendor dashboards. Sources: zoho.com whats-new docs; productowl.io feature audit (2026-01-16).
-- Model fit: **partial**. The lost-receipt declaration, approval chains, and audit-trail concepts map well to LOCUS needs and informed our design. But corporate-card matching, GST/IRS tax logic, and per-user pricing are dead weight, and there is **no historical-backlog reconstruction**.
+- Model fit: **partial**. The lost-receipt declaration, approval chains, and audit-trail concepts map well to FINANCE TRACKER needs and informed our design. But corporate-card matching, GST/IRS tax logic, and per-user pricing are dead weight, and there is **no historical-backlog reconstruction**.
 
 ### Expensify
 - Strengths verified: SmartScan zero-entry capture, realtime policy checks flagging non-reimbursable spend before submission, SMS receipt intake (US-number only — not usable in Nepal), Gmail/outlook receipt forwarding. Sources: use.expensify.com resource center (2025-10-08); expensent.com troubleshooting guide (2026-04-01).
-- Notable limitation surfaced: SmartScan blocks report submission while scans are pending, and email-signature images can confuse OCR — evidence that even mature OCR needs a human review layer. LOCUS design adopts the same principle (OCR output ≠ accounting data).
+- Notable limitation surfaced: SmartScan blocks report submission while scans are pending, and email-signature images can confuse OCR — evidence that even mature OCR needs a human review layer. FINANCE TRACKER design adopts the same principle (OCR output ≠ accounting data).
 - Pricing: per-user monthly (verify current rate at expensify.com/pricing before any decision; not quoted here to avoid stale figures).
 
 ### SAP Concur
 - Enterprise travel-and-expense suite. Verified general positioning: powerful but implementation-heavy, priced for enterprises. **Rejected**: cost and complexity orders of magnitude beyond a student organization's needs; no Nepal-specific student relevance.
 
 ### QuickBooks
-- General accounting, not expense management. LOCUS does not need full US-centric SMB accounting. **Rejected** as primary platform; its chart-of-accounts concepts inform the data model only.
+- General accounting, not expense management. FINANCE TRACKER does not need full US-centric SMB accounting. **Rejected** as primary platform; its chart-of-accounts concepts inform the data model only.
 
-**Buy-vs-build verdict:** Build custom (see 01). Rationale in one line: LOCUS's highest-value problem is reconstructing a dirty past, and no commercial product addresses that; commercial products optimize corporate spend present-tense.
+**Buy-vs-build verdict:** Build custom (see 01). Rationale in one line: Finance Tracker's highest-value problem is reconstructing a dirty past, and no commercial product addresses that; commercial products optimize corporate spend present-tense.
 
 ## B. OCR / Document Intelligence (verified findings)
 
@@ -33,7 +33,7 @@
 
 **Industry accuracy reality check (thinklytics.com, 2026-09-25, citing arXiv:2603.22651):** field-level F1 0.90–0.94, but whole-document strict accuracy only **63–76%**; manual invoice processing costs ~$9.84 each at 18.4% exception rate — i.e., the human exception queue is the real cost and the real control point. Conclusion: design for review queues, not straight-through automation.
 
-**LOCUS OCR decision:** Primary = PaddleOCR PP-OCRv5 Devanagari+English self-hosted workers (free, private, CPU-friendly). Escalation path = Google Document AI Invoice Parser for low-confidence scans, gated on FM opt-in per batch due to data leaving premises. Tesseract retained as a second engine for vote/ensemble on critical fields.
+**FINANCE TRACKER OCR decision:** Primary = PaddleOCR PP-OCRv5 Devanagari+English self-hosted workers (free, private, CPU-friendly). Escalation path = Google Document AI Invoice Parser for low-confidence scans, gated on FM opt-in per batch due to data leaving premises. Tesseract retained as a second engine for vote/ensemble on critical fields.
 
 ## C. Storage
 
@@ -48,7 +48,7 @@
 | **Supabase Pro** | $25/mo base: Postgres 8GB, Auth 100k MAU, Storage 100GB, Edge Functions 2M, daily backups 7-day; never pauses (free tier auto-pauses after 7 days) | ✅ Recommended backend |
 | Supabase Free | $0 but pauses after 1 week idle, 500MB DB, no backups | Dev only |
 | Neon / Xata | ~$14–26/mo, DB-only | Viable alt if self-managing auth/storage |
-| VPS (Hetzner/DigitalOcean) + self-hosted Postgres + MinIO | ~$5–10/mo + maintenance burden | Cheapest, but LOCUS has no dedicated sysadmin; rejected for v1, viable fallback |
+| VPS (Hetzner/DigitalOcean) + self-hosted Postgres + MinIO | ~$5–10/mo + maintenance burden | Cheapest, but FINANCE TRACKER has no dedicated sysadmin; rejected for v1, viable fallback |
 | AWS RDS + full AWS stack | $80–120/mo equivalent | Overkill (makerkit.dev Supabase pricing analysis, 2026-06; metacto.com 2026-05) |
 
 ## E. Frontend / Backend candidates

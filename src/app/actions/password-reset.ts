@@ -9,7 +9,7 @@ import type { ActionResult } from "@/lib/action-result";
 export async function requestPasswordResetAction(_prev: ActionResult, fd: FormData): Promise<ActionResult> {
   const email = str(fd, "email");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    return { ok: false, error: "Enter the email address for your LOCUS account." };
+    return { ok: false, error: "Enter the email address for your FINANCE TRACKER account." };
   }
   try {
     const db = await getDb();

@@ -1,7 +1,7 @@
 # FORENSIC VERIFICATION
 
 **Verified:** 2026-10-24
-**Repository:** `/Users/ashim/Downloads/LOCUS FINANCE AUTOMATION`
+**Repository:** `/Users/ashim/Downloads/FINANCE TRACKER AUTOMATION`
 **Baseline commit:** `f2a81d0` (research archive preserved at `5fec879`)
 **Final code state:** working tree, uncommitted at the time of this report
 **Method:** inspected the documentation, source, migrations, on-disk database, document store, tests, running application, and disposable restore. Prior completion claims were treated as hypotheses until a command or test supported them.
@@ -35,8 +35,8 @@ A feature is not marked TESTED-PASS merely because its implementation exists.
 
 The pre-change state was preserved before modification at:
 
-- `/Users/ashim/locus-backups/20261024-125330` (pre-change, checksums verified)
-- `/Users/ashim/locus-backups/20261024-140908-pre-003` (pre-migration, `VERIFIED`)
+- `/Users/ashim/finance-tracker-backups/20261024-125330` (pre-change, checksums verified)
+- `/Users/ashim/finance-tracker-backups/20261024-140908-pre-003` (pre-migration, `VERIFIED`)
 
 ---
 
@@ -68,7 +68,7 @@ The schema is ordinary PostgreSQL SQL. It uses no extensions and no PGlite-only 
 
 ## 3. What financial records exist
 
-**Finding: the database contains synthetic demo records only. No real LOCUS financial history was supplied or reconstructed.**
+**Finding: the database contains synthetic demo records only. No real FINANCE TRACKER financial history was supplied or reconstructed.**
 
 Current counts after the final E2E runs:
 
@@ -86,9 +86,9 @@ Current counts after the final E2E runs:
 
 The E2E suite intentionally creates synthetic claims/payments in the demo database. The counts above are therefore not the original seed counts. Every financial row remains flagged `is_synthetic = true`.
 
-The personal eSewa statement in `~/Downloads` was **not** imported. It belongs to an individual, not LOCUS. The historical sponsor files were inspected read-only (see §8), not imported.
+The personal eSewa statement in `~/Downloads` was **not** imported. It belongs to an individual, not FINANCE TRACKER. The historical sponsor files were inspected read-only (see §8), not imported.
 
-No historical LOCUS total is asserted anywhere in this report.
+No historical FINANCE TRACKER total is asserted anywhere in this report.
 
 ---
 
@@ -159,7 +159,7 @@ bank lines: 6
 
 ### Backup restore drill (genuinely executed)
 
-1. Created `/Users/ashim/locus-backups/20261024-160509-final-drill` from the stopped demo database.
+1. Created `/Users/ashim/finance-tracker-backups/20261024-160509-final-drill` from the stopped demo database.
 2. `npm run db:verify-backup -- --from …` returned **`VERIFIED`**.
 3. Restored into a disposable temp directory with separate database and document targets.
 4. `npx tsx scripts/verify-restored.ts …` returned **`RESTORED DATABASE VERIFIED`**:
@@ -207,11 +207,11 @@ The restore also revokes all sessions in the restored database by default, so an
 
 ## 8. Historical import readiness
 
-**Finding: the current application cannot safely bulk-import the supplied historical LOCUS sponsor files.**
+**Finding: the current application cannot safely bulk-import the supplied historical FINANCE TRACKER sponsor files.**
 
 Source files were inspected read-only outside the repository, including:
 
-- `~/Downloads/Sponsor of locus/Sponsorships of LOCUS 2021.xlsx` — 1,005 rows, 26 columns, mixed company/contact/status/amount free text across years.
+- `~/Downloads/Sponsor of finance-tracker/Sponsorships of FINANCE TRACKER 2021.xlsx` — 1,005 rows, 26 columns, mixed company/contact/status/amount free text across years.
 - Other sponsor workbooks/proposals in the same folder — heterogeneous columns, merged cells, planning notes, no stable ledger schema.
 
 The files are **planning/contact sheets**, not a receipt ledger. They do not establish cash received, and a guessed column mapping would fabricate financial history. The only bulk importer implemented is the constrained bank-statement importer (`src/server/accounts.ts`). `import_batches`/`import_rows` exist as staging tables but have no generic importer/UI.
@@ -245,7 +245,7 @@ OCR never creates a claim, payment, or journal entry.
 | B — partial payment | NPR 8,000 expense with NPR 3,000 reimbursed leaves NPR 5,000 outstanding; no over-payment | **TESTED-PASS** |
 | C — advance settlement | NPR 10,000 advance settled by NPR 7,000 expense and NPR 3,000 return has no double count | **TESTED-PASS** |
 | D — sponsor commitment vs receipt | NPR 100,000 commitment and NPR 40,000 receipt remain distinct | **TESTED-PASS** |
-| E — internal transfer | NPR 20,000 between LOCUS accounts is neither income nor expenditure | **TESTED-PASS** |
+| E — internal transfer | NPR 20,000 between FINANCE TRACKER accounts is neither income nor expenditure | **TESTED-PASS** |
 | F — statement re-import | Re-importing the same statement creates no duplicate financial recognition | **TESTED-PASS** |
 | G — split allocation | Splitting one NPR 5,000 expense across two events does not inflate organisation-wide expenditure | **TESTED-PASS** |
 | H — payment reversal | Reversal preserves the original, links the reversal, audits before/after, and does not double count | **TESTED-PASS** |
@@ -305,7 +305,7 @@ Additionally, on a disposable database with `MFA_ENFORCE=true`:
 ## 13. Local startup
 
 ```bash
-cd "/Users/ashim/Downloads/LOCUS FINANCE AUTOMATION"
+cd "/Users/ashim/Downloads/FINANCE TRACKER AUTOMATION"
 npm ci
 npm run db:migrate
 npm run db:seed-demo      # synthetic demo only
@@ -329,9 +329,9 @@ MFA_ENFORCE=true NODE_ENV=production npm start
 Backup and restore:
 
 ```bash
-npm run db:backup -- --out /secure/locus-backup
-npm run db:verify-backup -- --from /secure/locus-backup
-npm run db:restore -- --from /secure/locus-backup \
+npm run db:backup -- --out /secure/finance-tracker-backup
+npm run db:verify-backup -- --from /secure/finance-tracker-backup
+npm run db:restore -- --from /secure/finance-tracker-backup \
   --database-dir /scratch/pglite --document-dir /scratch/documents
 ```
 
@@ -366,4 +366,4 @@ The application is a credible single-instance finance system with real double-en
 
 It is **not** a production-ready multi-instance deployment. The remaining production blockers are managed PostgreSQL, provider-level backup/PITR, Nepali/scanned-PDF OCR, real email/reset, and several documented policy/security gaps. Those are reported as **BLOCKED** or **NOT-TESTED**, not hidden.
 
-The most important property is preserved: the system refuses to invent LOCUS’s history. All current financial data is synthetic, and no historical total is asserted without evidence.
+The most important property is preserved: the system refuses to invent FINANCE TRACKER’s history. All current financial data is synthetic, and no historical total is asserted without evidence.

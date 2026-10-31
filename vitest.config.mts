@@ -23,7 +23,7 @@ export default defineConfig({
     fileParallelism: false,
     env: {
       TZ: "Asia/Kathmandu",
-      DOCUMENT_DIR: path.join(os.tmpdir(), `locus-test-documents-${process.pid}`),
+      DOCUMENT_DIR: path.join(os.tmpdir(), `finance-tracker-test-documents-${process.pid}`),
     },
   },
 });

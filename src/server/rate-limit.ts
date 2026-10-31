@@ -12,7 +12,7 @@ export type RateLimitResult = {
 /**
  * Durable fixed-window limiter. Counters live in Postgres, so a restart or a
  * second app process does not reset the window. It is deliberately simple:
- * LOCUS scale does not need a distributed token-bucket service.
+ * FINANCE TRACKER scale does not need a distributed token-bucket service.
  */
 export async function consumeRateLimit(
   db: Executor,

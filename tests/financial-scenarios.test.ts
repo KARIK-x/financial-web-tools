@@ -59,7 +59,7 @@ async function claim(input: {
     description: `Financial scenario on ${input.date}`,
     amount: input.amount,
     categoryId: input.categoryId ?? "cat_printing",
-    fundingSource: input.advanceId ? "LOCUS_CASH" : "PERSONAL",
+    fundingSource: input.advanceId ? "FINANCE_TRACKER_CASH" : "PERSONAL",
     advanceId: input.advanceId,
     allocations: input.allocations,
     missingReceiptDeclaration: input.documentIds?.length ? null : "Synthetic test declaration; no real receipt is used.",
@@ -160,7 +160,7 @@ describe("financial scenarios A–J", () => {
     expect((await cashflowTotals()).income).toBe(4_000_000);
   });
 
-  it("E: a NPR 20,000 transfer between LOCUS accounts is not income or expenditure", async () => {
+  it("E: a NPR 20,000 transfer between FINANCE TRACKER accounts is not income or expenditure", async () => {
     const before = await cashflowTotals();
     const accountsBefore = await db.query<{ id: string; balance: string }>(
       `SELECT id, (opening_balance_paisa

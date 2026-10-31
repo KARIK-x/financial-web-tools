@@ -2,7 +2,7 @@
 
 Status labels used throughout: `IMPLEMENTED`, `TESTED-PASS`, `TESTED-FAIL`, `NOT-TESTED`, `BLOCKED`.
 
-This document is the current release-readiness record for the LOCUS Finance Intelligence Platform. It reflects the repository as inspected and tested on 2026-10-24. It does not claim that blocked external services work.
+This document is the current release-readiness record for the Finance Tracker Intelligence Platform. It reflects the repository as inspected and tested on 2026-10-24. It does not claim that blocked external services work.
 
 ## 1. Executive summary
 

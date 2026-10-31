@@ -1,16 +1,16 @@
 # CURRENT PROJECT STATE
 
 **As of:** 2026-10-24
-**Location:** `/Users/ashim/Downloads/LOCUS FINANCE AUTOMATION`
+**Location:** `/Users/ashim/Downloads/FINANCE TRACKER AUTOMATION`
 **Stage:** feature-complete single-organisation application; production hardening partially complete; managed PostgreSQL still blocked.
 
 ---
 
 ## 1. Summary
 
-The LOCUS Finance Intelligence Platform is a working Next.js application backed by a real PostgreSQL-compatible database (PGlite). It implements expense claims, approvals, payments, advances, sponsorships, budgets, documents/OCR review, bank statement reconciliation, double-entry accounting, reports, exports, RBAC, MFA, period locks, durable rate limiting, and an append-only audit trail.
+The Finance Tracker Intelligence Platform is a working Next.js application backed by a real PostgreSQL-compatible database (PGlite). It implements expense claims, approvals, payments, advances, sponsorships, budgets, documents/OCR review, bank statement reconciliation, double-entry accounting, reports, exports, RBAC, MFA, period locks, durable rate limiting, and an append-only audit trail.
 
-It is **not** a reconstruction of LOCUS’s historical books. The supplied materials contained no usable organisational ledger; all current financial rows are synthetic and marked as such.
+It is **not** a reconstruction of FINANCE TRACKER’s historical books. The supplied materials contained no usable organisational ledger; all current financial rows are synthetic and marked as such.
 
 ---
 
@@ -55,7 +55,7 @@ The demo database was **not** reset after the final E2E runs. It contains the se
 
 Migrations: `001_init.sql`, `002_reference.sql`, `003_operational_hardening.sql`. Public tables: **39**.
 
-Demo users: `admin@`, `finance@`, `executive@`, `events@`, `member@`, `auditor@` `locus.demo`. The shared password is in `.data/demo-credentials.txt` (mode 0600). It is never printed.
+Demo users: `admin@`, `finance@`, `executive@`, `events@`, `member@`, `auditor@` `finance-tracker.demo`. The shared password is in `.data/demo-credentials.txt` (mode 0600). It is never printed.
 
 ---
 
@@ -151,7 +151,7 @@ Demo users: `admin@`, `finance@`, `executive@`, `events@`, `member@`, `auditor@`
 | `.data/initial-admin-credentials.txt` | First-admin password, if generated | ignored |
 | `db/migrations` | Schema history | committed |
 | `docs/` | Documentation | committed |
-| `/Users/ashim/locus-backups/*` | Verified local backups | outside repo |
+| `/Users/ashim/finance-tracker-backups/*` | Verified local backups | outside repo |
 
 ---
 
@@ -174,7 +174,7 @@ See `KNOWN_BUGS.md`, `TASK_QUEUE.md`, and `POSTGRESQL_MIGRATION_PLAN.md`.
 ## 9. Run it
 
 ```bash
-cd "/Users/ashim/Downloads/LOCUS FINANCE AUTOMATION"
+cd "/Users/ashim/Downloads/FINANCE TRACKER AUTOMATION"
 npm ci
 npm run db:migrate
 npm run db:seed-demo     # evaluation only
@@ -186,8 +186,8 @@ Real workspace: `db:migrate` → `db:create-admin` → sign in → forced passwo
 Backup:
 
 ```bash
-npm run db:backup -- --out /secure/locus-backup
-npm run db:verify-backup -- --from /secure/locus-backup
+npm run db:backup -- --out /secure/finance-tracker-backup
+npm run db:verify-backup -- --from /secure/finance-tracker-backup
 ```
 
 Stop the app before backup/reset/seed.

@@ -123,7 +123,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
               <div className="card-body">
                 <ActionForm action={createAccountAction} submitLabel="Create account" resetOnSuccess>
                   <div className="grid" style={{ gap: 10 }}>
-                    <div className="field"><label className="label">Name</label><input name="name" required placeholder="e.g. NIC Asia — LOCUS current" /></div>
+                    <div className="field"><label className="label">Name</label><input name="name" required placeholder="e.g. NIC Asia — FINANCE TRACKER current" /></div>
                     <div className="field">
                       <label className="label">Type</label>
                       <select name="type" defaultValue="BANK"><option value="BANK">Bank</option><option value="CASH">Cash</option><option value="WALLET">Wallet</option></select>

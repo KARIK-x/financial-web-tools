@@ -140,7 +140,7 @@ export default async function SettingsPage() {
             <ActionForm action={saveOrganizationAction} submitLabel="Save profile" className="form-grid">
               <div className="field">
                 <label className="label" htmlFor="name">Short name</label>
-                <input id="name" name="name" defaultValue={org?.name ?? "LOCUS"} required />
+                <input id="name" name="name" defaultValue={org?.name ?? "FINANCE TRACKER"} required />
               </div>
               <div className="field">
                 <label className="label" htmlFor="legalName">Legal name</label>

@@ -1,6 +1,6 @@
 # ACCOUNTING RULES
 
-This document defines how the LOCUS Finance platform turns business events into journal entries and reports. It is the reference for anyone reviewing the books or changing the code.
+This document defines how the Finance Tracker platform turns business events into journal entries and reports. It is the reference for anyone reviewing the books or changing the code.
 
 **Currency:** NPR only. **Unit:** integer paisa (NPR 1.00 = 100 paisa). **Basis:** accrual, double-entry. **Fiscal year:** BS, starting in Shrawan (month 4); the period containing 2026-10-24 is BS 2083/84 (2026-07-17 → 2027-07-16).
 
@@ -40,7 +40,7 @@ Category ledger codes are stored on `expense_categories.ledger_code`; the journa
 
 ### 3.1 Expense claim approved — personal funds
 
-The member has already spent their own money; LOCUS owes them.
+The member has already spent their own money; FINANCE TRACKER owes them.
 
 ```
 Dr  Expense category (e.g. 5003 Food & Refreshments)   amount
@@ -51,7 +51,7 @@ Claim status → `PAYMENT_PENDING`.
 
 ### 3.2 Expense claim approved — organisation funds
 
-LOCUS will pay a vendor/invoice from its own money. A clearing liability is used until payment, so no member payable is created.
+FINANCE TRACKER will pay a vendor/invoice from its own money. A clearing liability is used until payment, so no member payable is created.
 
 ```
 Dr  Expense category                                   amount
@@ -258,8 +258,8 @@ A recorded payment is never edited or deleted. `reversePayment` creates a linked
 
 ## 10. What this system does not decide
 
-- Whether a particular expense is programmatically allowable under LOCUS’s constitution.
-- Whether LOCUS is VAT-registered or has a PAN (status is `UNVERIFIED` in settings).
+- Whether a particular expense is programmatically allowable under FINANCE TRACKER’s constitution.
+- Whether FINANCE TRACKER is VAT-registered or has a PAN (status is `UNVERIFIED` in settings).
 - Whether a sponsor pledge is legally enforceable.
 - Tax treatment of any receipt or payment.
 
