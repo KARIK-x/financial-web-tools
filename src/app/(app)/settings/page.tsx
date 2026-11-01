@@ -31,6 +31,7 @@ const PERMISSION_HINTS: Record<Permission, string> = {
   "document.upload": "Upload receipts and statements",
   "document.view.all": "Open documents attached to any claim",
   "document.review": "Accept or correct extracted receipt fields",
+  "document.search": "Search authorized documents",
   "sponsor.manage": "Create agreements and record receipts",
   "budget.manage": "Create events, budgets and revisions",
   "account.manage": "Create accounts and record transfers",

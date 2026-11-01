@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireUser, requestContext } from "@/server/auth";
 import { getDb } from "@/server/db";
 import { attachDocumentToClaim, createBatch, processDocumentOcr, reviewDocument, saveDocumentCorrection, uploadOne } from "@/server/documents";
+import { queueDocumentOcr, processNextOcrJob } from "@/server/ocr-queue";
+import { requestedOcrEngine } from "@/server/ocr-engine";
+import { rebuildDocumentSearchIndex } from "@/server/document-search";
 import { bool, fail, file, optional, str } from "@/server/action-utils";
 import type { ActionResult } from "@/lib/action-result";
 
@@ -31,18 +34,29 @@ export async function uploadDocumentAction(_prev: ActionResult, fd: FormData): P
       },
       ctx,
     );
+    await rebuildDocumentSearchIndex(db, result.documentId);
+    let queuedStatus = "queued";
+    try {
+      const queued = await queueDocumentOcr(db, user, result.documentId, { engine: requestedOcrEngine() });
+      queuedStatus = queued.status.toLowerCase();
+      if (process.env.OCR_AUTO_PROCESS !== "false") {
+        void processNextOcrJob("upload").catch(() => {});
+      }
+    } catch (err) {
+      queuedStatus = "not queued";
+    }
     revalidatePath("/receipts");
     revalidatePath("/overview");
     if (result.duplicate) {
       return {
         ok: true,
-        message: `This exact file already exists as document ${result.duplicateOf?.slice(0, 8)}. The original was kept.`,
+        message: `This exact file already exists as document ${result.duplicateOf?.slice(0, 8)}. The original was kept. OCR ${queuedStatus}.`,
         redirectTo: `/receipts/${result.documentId}`,
       };
     }
     return {
       ok: true,
-      message: `Uploaded ${result.filename}.`,
+      message: `Uploaded ${result.filename}. OCR ${queuedStatus}.`,
       warning: result.nearDuplicateOf ? "A visually similar image already exists. Review the duplicate flag before using this receipt." : undefined,
       redirectTo: `/receipts/${result.documentId}`,
     };

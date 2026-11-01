@@ -37,7 +37,7 @@ suite("managed PostgreSQL adapter", () => {
     const tables = await db.query<{ n: string }>(
       `SELECT COUNT(*)::text AS n FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'`,
     );
-    expect(Number(tables.rows[0]?.n)).toBe(44); // 43 domain tables + schema_migrations
+    expect(Number(tables.rows[0]?.n)).toBe(46); // 45 domain tables + schema_migrations
 
     const member = await createPerson(db, { role: "MEMBER", name: "PG Member", synthetic: true });
     const finance = await createPerson(db, { role: "FINANCE", name: "PG Finance", synthetic: true });

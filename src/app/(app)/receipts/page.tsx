@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/server/auth";
 import { getDb, one } from "@/server/db";
 import { listDocuments } from "@/server/documents";
+import { searchDocuments } from "@/server/document-search";
 import { ocrCapability } from "@/server/ocr";
 import { malwareScanCapability, malwareScanRequired } from "@/server/malware";
 import { formatTimestamp } from "@/lib/nepali-date";
@@ -26,8 +27,24 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
   const q = pick(sp, "q");
   const status = pick(sp, "status");
 
-  const [documents, summary, capability, scanCapability] = await Promise.all([
-    listDocuments(db, user, { q, status, limit: 150 }),
+  const amountMin = pick(sp, "amountMin") ? Number(pick(sp, "amountMin")) : undefined;
+  const amountMax = pick(sp, "amountMax") ? Number(pick(sp, "amountMax")) : undefined;
+  const dateFrom = pick(sp, "dateFrom");
+  const dateTo = pick(sp, "dateTo");
+  const sort = (pick(sp, "sort") as "relevance" | "newest" | "oldest" | "amount" | undefined) ?? (q ? "relevance" : "newest");
+
+  const [search, summary, capability, scanCapability] = await Promise.all([
+    searchDocuments(db, user, {
+      query: q,
+      status,
+      docType: pick(sp, "type"),
+      dateFrom,
+      dateTo,
+      amountMin: Number.isFinite(amountMin) ? amountMin : undefined,
+      amountMax: Number.isFinite(amountMax) ? amountMax : undefined,
+      sort,
+      pageSize: 100,
+    }),
     one<{ total: number; review: number; duplicates: number; failed: number; extracted: number }>(
       db,
       `SELECT COUNT(*)::int AS total,
@@ -43,6 +60,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
     ocrCapability(),
     malwareScanCapability(),
   ]);
+  const documents = search.rows;
 
   return (
     <>
@@ -72,7 +90,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
             <ActionForm action={uploadDocumentAction} submitLabel="Upload document">
               <div className="field" style={{ marginBottom: 10 }}>
                 <label className="label" htmlFor="file">File</label>
-                <input id="file" name="file" type="file" required accept="image/*,application/pdf,text/csv,.xlsx,.xls" />
+                <input id="file" name="file" type="file" required accept="image/*,application/pdf,text/csv,.xlsx,.xls" capture="environment" />
               </div>
               <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                 <div className="field">
@@ -108,7 +126,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
       <div className="card">
         <div className="card-head">
           <form method="get" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <input name="q" defaultValue={q} placeholder="Search filename or claim" style={{ width: 240 }} />
+            <input name="q" defaultValue={q} placeholder="Search bill text, merchant, invoice, amount, date..." style={{ minWidth: 260, flex: 1 }} />
             <select name="status" defaultValue={status ?? ""}>
               <option value="">All statuses</option>
               <option value="UPLOADED">Uploaded</option>
@@ -117,10 +135,28 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
               <option value="REVIEWED">Reviewed</option>
               <option value="FAILED">Failed</option>
             </select>
-            <button className="btn btn-sm" type="submit">Filter</button>
-            {q || status ? <Link className="link small" href="/receipts">Clear</Link> : null}
+            <select name="type" defaultValue={pick(sp, "type") ?? ""}>
+              <option value="">All types</option>
+              <option value="RECEIPT">Receipt</option>
+              <option value="INVOICE">Invoice</option>
+              <option value="BANK_STATEMENT">Bank statement</option>
+              <option value="PAYMENT_CONFIRMATION">Payment confirmation</option>
+              <option value="OTHER">Other</option>
+            </select>
+            <input name="dateFrom" type="date" defaultValue={dateFrom} />
+            <input name="dateTo" type="date" defaultValue={dateTo} />
+            <input name="amountMin" type="number" step="0.01" placeholder="Min NPR" defaultValue={pick(sp, "amountMin")} style={{ width: 110 }} />
+            <input name="amountMax" type="number" step="0.01" placeholder="Max NPR" defaultValue={pick(sp, "amountMax")} style={{ width: 110 }} />
+            <select name="sort" defaultValue={sort}>
+              <option value="relevance">Relevance</option>
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="amount">Amount</option>
+            </select>
+            <button className="btn btn-sm" type="submit">Search</button>
+            {q || status || pick(sp, "type") || dateFrom || dateTo || pick(sp, "amountMin") || pick(sp, "amountMax") ? <Link className="link small" href="/receipts">Clear</Link> : null}
           </form>
-          <span className="tiny muted">{documents.length} shown</span>
+          <span className="tiny muted">{documents.length} shown{search.total ? ` of ${search.total}` : ""}</span>
         </div>
         <div className="table-wrap">
           {documents.length ? (
@@ -132,6 +168,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
                     <td>
                       <Link className="row-title link-quiet" href={`/receipts/${doc.id}`}>{doc.filename}</Link>
                       {doc.duplicate_of ? <div className="row-sub">Possible duplicate of {doc.duplicate_of.slice(0, 8)}</div> : null}
+                      {doc.snippet ? <div className="row-sub search-snippet" dangerouslySetInnerHTML={{ __html: doc.snippet }} /> : null}
                     </td>
                     <td className="muted">{doc.doc_type.replaceAll("_", " ")}</td>
                     <td>{doc.claim_no ? <Link className="link" href={`/expenses/${doc.claim_id}`}>{doc.claim_no}</Link> : <span className="faint">Unattached</span>}</td>

@@ -29,6 +29,11 @@ Statuses: `[ ]` NOT STARTED, `[~]` IN PROGRESS, `[!]` IMPLEMENTED BUT NOT VERIFI
 - [x] T025 Sole-admin break-glass — Evidence: `tests/financial-controls.test.ts`.
 - [x] T026 Nonce CSP — Evidence: `src/proxy.ts`, build/E2E pass.
 - [x] T028 Storage security regression tests — Evidence: `tests/storage-security.test.ts` 6/6, path traversal and ZIP limits verified.
+- [x] T029 OCR engine adapter — Evidence: `src/server/ocr-engine.ts`, `tests/ocr-engine.test.ts` 5/5, Tesseract fallback preserved.
+- [x] T033 Asynchronous OCR queue and worker — Evidence: `src/server/ocr-queue.ts`, `scripts/ocr-worker.ts`, `tests/ocr-queue.test.ts` 2/2.
+- [x] T034 Searchable document repository — Evidence: `db/migrations/012_document_search_index.sql`, `src/server/document-search.ts`, `tests/document-search.test.ts` 5/5.
+- [x] T035 Document search UI — Evidence: receipts page search, filters, snippets; E2E search 1/1.
+- [x] T096 OCR benchmark harness — Evidence: `scripts/benchmark-ocr.ts`.
 - [B] T027 Application-level encryption at rest — Blocked: provider-managed encryption recommended; not implemented.
 
 ## OCR
@@ -71,7 +76,7 @@ Statuses: `[ ]` NOT STARTED, `[~]` IN PROGRESS, `[!]` IMPLEMENTED BUT NOT VERIFI
 - [x] T095 Retention/legal hold — Legal-hold metadata, server controls, receipt UI, retention report, automated enforcement report, and tests implemented.
 
 ## Testing
-- [x] T100 Unit/integration suite — 148 tests passing, 3 skipped.
-- [x] T101 E2E suite — 8/8 passing.
+- [x] T100 Unit/integration suite — 168 tests passing, 3 skipped.
+- [x] T101 E2E suite — 11/11 passing.
 - [x] T102 PostgreSQL tests — 3/3 passing.
 - [x] T103 Build/typecheck — passing.

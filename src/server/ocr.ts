@@ -5,6 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import sharp from "sharp";
 import { normalizeDigits, parseMoney } from "@/lib/money";
+import { requestedOcrEngine, unlimitedOcrExtract, unlimitedOcrHealth, normalizeUnlimitedResult, type OcrEngineName } from "./ocr-engine";
 import { bsToAd, isValidISODate } from "@/lib/nepali-date";
 
 const run = promisify(execFile);
@@ -402,25 +403,68 @@ export function extractReceiptFields(text: string): { fields: ExtractedFields; c
   return { fields, confidence };
 }
 
-export async function runExtraction(bytes: Buffer, mime: string, filename: string): Promise<ExtractionOutcome> {
+export async function runExtraction(
+  bytes: Buffer,
+  mime: string,
+  filename: string,
+  engine: OcrEngineName = requestedOcrEngine(),
+): Promise<ExtractionOutcome> {
   const started = Date.now();
-  const text = await extractDocumentText(bytes, mime, filename);
-  const durationMs = Date.now() - started;
-  if ("error" in text) {
+
+  const runTesseract = async (): Promise<ExtractionOutcome> => {
+    const text = await extractDocumentText(bytes, mime, filename);
+    const durationMs = Date.now() - started;
+    if ("error" in text) {
+      return {
+        engine: "none", engineVersion: "n/a", rawText: "", fields: {}, confidence: {},
+        status: "FAILED", error: text.error, durationMs,
+      };
+    }
+    const { fields, confidence } = extractReceiptFields(text.text);
     return {
-      engine: "none", engineVersion: "n/a", rawText: "", fields: {}, confidence: {},
-      status: "FAILED", error: text.error, durationMs,
+      engine: text.engine,
+      engineVersion: text.version,
+      rawText: text.text.slice(0, 50_000),
+      fields,
+      confidence,
+      status: Object.keys(fields).length ? "SUCCEEDED" : "SKIPPED",
+      durationMs,
+      pages: text.pages,
     };
-  }
-  const { fields, confidence } = extractReceiptFields(text.text);
-  return {
-    engine: text.engine,
-    engineVersion: text.version,
-    rawText: text.text.slice(0, 50_000),
-    fields,
-    confidence,
-    status: Object.keys(fields).length ? "SUCCEEDED" : "SKIPPED",
-    durationMs,
-    pages: text.pages,
   };
+
+  if (engine === "tesseract") return runTesseract();
+
+  if (engine === "unlimited-ocr") {
+    const health = await unlimitedOcrHealth();
+    if (!health.ok) {
+      return {
+        engine: "none", engineVersion: "n/a", rawText: "", fields: {}, confidence: {},
+        status: "FAILED", error: `Unlimited OCR is unavailable: ${health.detail ?? "unknown error"}`,
+        durationMs: Date.now() - started,
+      };
+    }
+    try {
+      const result = await unlimitedOcrExtract(bytes, mime, filename);
+      return normalizeUnlimitedResult(result);
+    } catch (err) {
+      return {
+        engine: "none", engineVersion: "n/a", rawText: "", fields: {}, confidence: {},
+        status: "FAILED", error: `Unlimited OCR failed: ${err instanceof Error ? err.message : String(err)}`,
+        durationMs: Date.now() - started,
+      };
+    }
+  }
+
+  const health = await unlimitedOcrHealth();
+  if (health.ok) {
+    try {
+      const result = await unlimitedOcrExtract(bytes, mime, filename);
+      const normalized = normalizeUnlimitedResult(result);
+      if (normalized.status === "SUCCEEDED") return normalized;
+    } catch {
+      // Fall through to the local Tesseract implementation.
+    }
+  }
+  return runTesseract();
 }

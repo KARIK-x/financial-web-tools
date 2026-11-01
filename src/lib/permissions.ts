@@ -12,7 +12,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export const PERMISSIONS = [
   "expense.submit", "expense.view.all", "expense.approve", "expense.pay", "expense.verify",
-  "advance.manage", "document.upload", "document.view.all", "document.review",
+  "advance.manage", "document.upload", "document.view.all", "document.review", "document.search",
   "sponsor.manage", "budget.manage", "account.manage", "recon.manage",
   "report.view", "export.run", "audit.view", "settings.manage", "member.manage", "import.run",
 ] as const;
@@ -21,10 +21,10 @@ export type Permission = (typeof PERMISSIONS)[number];
 export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ADMIN: [...PERMISSIONS],
   FINANCE: PERMISSIONS.filter((p) => p !== "settings.manage"),
-  EXECUTIVE: ["expense.submit", "expense.view.all", "expense.approve", "report.view", "audit.view", "document.view.all"],
-  EVENT_HEAD: ["expense.submit", "expense.view.all", "expense.approve", "report.view", "document.upload"],
+  EXECUTIVE: ["expense.submit", "expense.view.all", "expense.approve", "report.view", "audit.view", "document.view.all", "document.search"],
+  EVENT_HEAD: ["expense.submit", "expense.view.all", "expense.approve", "report.view", "document.upload", "document.search"],
   MEMBER: ["expense.submit", "document.upload"],
-  AUDITOR: ["expense.view.all", "document.view.all", "report.view", "audit.view"],
+  AUDITOR: ["expense.view.all", "document.view.all", "report.view", "audit.view", "document.search"],
 };
 
 export function can(role: Role, permission: Permission, overrides?: Permission[]): boolean {

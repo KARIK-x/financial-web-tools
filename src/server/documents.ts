@@ -6,6 +6,9 @@ import {
 } from "./storage";
 import { runExtraction, type ExtractionOutcome } from "./ocr";
 import { recordAudit } from "./audit";
+import { rebuildDocumentSearchIndex } from "./document-search";
+import { queueDocumentOcr, processOcrJob, processNextOcrJob } from "./ocr-queue";
+import { requestedOcrEngine } from "./ocr-engine";
 import type { CurrentUser } from "./auth";
 import { can } from "@/lib/permissions";
 import { malwareScanRequired, scanBytes, validateUpload } from "./malware";
@@ -124,47 +127,111 @@ export async function uploadOne(
     after: { sha256: hash, filename, docType: input.docType ?? null },
     ip: ctx.ip, userAgent: ctx.userAgent,
   });
+  await rebuildDocumentSearchIndex(db, id);
   return { documentId: id, filename, duplicate: false, nearDuplicateOf: nearId };
 }
 
-export async function processDocumentOcr(db: Db, user: CurrentUser, documentId: string, ctx: { ip?: string | null } = {}): Promise<ExtractionOutcome> {
-  if (!can(user.role, "document.review", user.permissions)) throw new Error("You cannot run or review OCR.");
-  const doc = await one<{ id: string; filename: string; mime: string; storage_key: string; doc_type: string; scan_status: string }>(
-    db, `SELECT id, filename, mime, storage_key, doc_type, scan_status FROM documents WHERE id = $1`, [documentId],
+export async function processDocumentOcr(
+  db: Db,
+  user: CurrentUser,
+  documentId: string,
+  ctx: { ip?: string | null } = {},
+  options: { engine?: string; force?: boolean } = {},
+): Promise<ExtractionOutcome> {
+  const doc = await one<{ id: string; uploaded_by: string | null; scan_status: string }>(
+    db, `SELECT id, uploaded_by, scan_status FROM documents WHERE id = $1`, [documentId],
   );
-  if (!doc) throw new Error("Document not found");
+  if (!doc) throw new Error("Document not found.");
+  if (!can(user.role, "document.review", user.permissions)) {
+    throw new Error("You cannot run or review OCR.");
+  }
   if (doc.scan_status === "INFECTED" || (malwareScanRequired() && doc.scan_status !== "CLEAN")) {
     throw new Error("This document is quarantined by malware policy and cannot be processed or viewed.");
   }
-  const bytes = await readDocument(doc.storage_key);
-  const outcome = await runExtraction(bytes, doc.mime, doc.filename);
-  const extractionId = randomUUID();
-  await db.transaction(async (tx) => {
-    await tx.query(
-      `INSERT INTO ocr_extractions (id, document_id, engine, engine_version, status, raw_text, fields, confidence, error, duration_ms, created_by, finished_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,now())`,
-      [
-        extractionId, documentId, outcome.engine, outcome.engineVersion, outcome.status,
-        outcome.rawText || null, JSON.stringify(outcome.fields), JSON.stringify(outcome.confidence),
-        outcome.error ?? null, outcome.durationMs, user.id,
-      ],
-    );
-    await tx.query(
-      `UPDATE documents SET status = $2, extracted = $3::jsonb, field_sources = $4::jsonb WHERE id = $1`,
-      [
-        documentId,
-        outcome.status === "FAILED" ? "FAILED" : outcome.status === "SKIPPED" ? "NEEDS_REVIEW" : "EXTRACTED",
-        JSON.stringify(outcome.fields),
-        JSON.stringify({ ocr_extraction_id: extractionId, engine: outcome.engine, confidence: outcome.confidence }),
-      ],
-    );
+
+  const queued = await queueDocumentOcr(db, user, documentId, {
+    engine: options.engine ?? requestedOcrEngine(),
+    force: options.force ?? true,
   });
-  await recordAudit(db, {
-    actorUserId: user.id, actorName: user.name, action: "OCR_RUN",
-    entityType: "document", entityId: documentId,
-    summary: `OCR ${outcome.status.toLowerCase()} via ${outcome.engine}${outcome.error ? `: ${outcome.error}` : ""}`,
-    ip: ctx.ip,
-  });
+  const job = await one<{
+    id: string; status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+  }>(db, `SELECT id, status FROM ocr_jobs WHERE id = $1`, [queued.jobId]);
+  if (!job) throw new Error("OCR job was not created.");
+
+  if (job.status === "RUNNING") {
+    return {
+      engine: "none", engineVersion: "n/a", rawText: "", fields: {}, confidence: {},
+      status: "SKIPPED", error: "OCR is already running for this document.", durationMs: 0,
+    };
+  }
+  if (job.status === "SUCCEEDED" && !options.force) {
+    const latest = await one<{ engine: string; engine_version: string; raw_text: string | null; fields: Record<string, unknown>; confidence: Record<string, number>; error: string | null; duration_ms: number | null; pages: unknown }>(
+      db,
+      `SELECT engine, engine_version, raw_text, fields, confidence, error, duration_ms, pages
+         FROM ocr_extractions WHERE document_id = $1 ORDER BY started_at DESC LIMIT 1`,
+      [documentId],
+    );
+    if (latest) {
+      return {
+        engine: latest.engine,
+        engineVersion: latest.engine_version,
+        rawText: latest.raw_text ?? "",
+        fields: latest.fields ?? {},
+        confidence: latest.confidence ?? {},
+        status: "SUCCEEDED",
+        error: latest.error ?? undefined,
+        durationMs: latest.duration_ms ?? 0,
+        pages: Array.isArray(latest.pages) ? latest.pages as ExtractionOutcome["pages"] : undefined,
+      };
+    }
+  }
+
+  const claimed = await one<{ id: string; status: string }>(
+    db,
+    `UPDATE ocr_jobs
+        SET status = 'RUNNING',
+            started_at = COALESCE(started_at, now()),
+            attempts = attempts + 1,
+            worker_id = COALESCE(worker_id, $2),
+            lease_expires_at = now() + interval '2 minutes',
+            heartbeat_at = now()
+      WHERE id = $1 AND status = 'QUEUED'
+      RETURNING id, status`,
+    [job.id, user.id],
+  );
+  if (!claimed) {
+    const current = await one<{ status: string }>(db, `SELECT status FROM ocr_jobs WHERE id = $1`, [job.id]);
+    if (current?.status === "RUNNING") {
+      return {
+        engine: "none", engineVersion: "n/a", rawText: "", fields: {}, confidence: {},
+        status: "SKIPPED", error: "OCR is already running for this document.", durationMs: 0,
+      };
+    }
+    if (current?.status === "SUCCEEDED") {
+      const latest = await one<{ engine: string; engine_version: string; raw_text: string | null; fields: Record<string, unknown>; confidence: Record<string, number>; error: string | null; duration_ms: number | null; pages: unknown }>(
+        db,
+        `SELECT engine, engine_version, raw_text, fields, confidence, error, duration_ms, pages
+           FROM ocr_extractions WHERE document_id = $1 ORDER BY started_at DESC LIMIT 1`,
+        [documentId],
+      );
+      if (latest) {
+        return {
+          engine: latest.engine,
+          engineVersion: latest.engine_version,
+          rawText: latest.raw_text ?? "",
+          fields: latest.fields ?? {},
+          confidence: latest.confidence ?? {},
+          status: "SUCCEEDED",
+          error: latest.error ?? undefined,
+          durationMs: latest.duration_ms ?? 0,
+          pages: Array.isArray(latest.pages) ? latest.pages as ExtractionOutcome["pages"] : undefined,
+        };
+      }
+    }
+    throw new Error("OCR job could not be claimed.");
+  }
+
+  const outcome = await processOcrJob(db, { ...job, status: "QUEUED" } as never, user);
   return outcome;
 }
 
@@ -179,6 +246,7 @@ export async function saveDocumentCorrection(
      WHERE id = $1`,
     [documentId, JSON.stringify({ ...doc.extracted, ...fields, corrected: true }), user.id],
   );
+  await rebuildDocumentSearchIndex(db, documentId);
   await recordAudit(db, {
     actorUserId: user.id, actorName: user.name, action: "OCR_CORRECTED",
     entityType: "document", entityId: documentId,
@@ -226,6 +294,7 @@ export async function attachDocumentToClaim(
       [claim.id],
     );
   });
+  await rebuildDocumentSearchIndex(db, input.documentId);
   await recordAudit(db, {
     actorUserId: user.id, actorName: user.name, action: "DOCUMENT_ATTACHED",
     entityType: "document", entityId: input.documentId,

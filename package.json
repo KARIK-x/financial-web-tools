@@ -27,7 +27,9 @@
     "backups:retention": "tsx scripts/backup-retention.ts",
     "retention:report": "tsx scripts/retention-report.ts",
     "backups:encrypt": "tsx scripts/backup-encrypt.ts",
-    "retention:enforce": "tsx scripts/retention-enforce.ts"
+    "retention:enforce": "tsx scripts/retention-enforce.ts",
+    "ocr:worker": "tsx scripts/ocr-worker.ts",
+    "ocr:benchmark": "tsx scripts/benchmark-ocr.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.11",
