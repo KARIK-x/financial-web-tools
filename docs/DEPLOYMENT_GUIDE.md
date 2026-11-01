@@ -63,6 +63,11 @@ Open `http://localhost:3000` → sign in with the email and the password from th
 | `FINANCE_TRACKER_ADMIN_PASSWORD` | generated | Alternative to `--password`; avoid exporting secrets in shared shells |
 | `NODE_ENV` | — | Set to `production` for `Secure` session cookies |
 | `MFA_ENFORCE` | off | Set to `true` to require TOTP enrollment for ADMIN/FINANCE/EXECUTIVE |
+| `OCR_ENGINE` | `tesseract` | OCR adapter: `tesseract`, `unlimited-ocr`, or `auto` |
+| `UNLIMITED_OCR_URL` | — | Optional HTTP endpoint for the separate Unlimited-OCR inference service |
+| `UNLIMITED_OCR_TIMEOUT_MS` | `30000` | Timeout for an Unlimited-OCR request |
+| `OCR_AUTO_PROCESS` | on | Set to `false` to queue OCR without immediate background processing |
+| `OCR_WORKER_TOKEN` | — | Bearer token for `/api/ocr/worker`; required in production when the worker endpoint is used |
 | `E2E_BASE_URL` | `http://localhost:3000` | Point Playwright at an already-running server |
 
 No `.env` file is required. If you use one, it is gitignored.
@@ -76,9 +81,10 @@ npm run dev            # development server (Turbopack)
 npm run build          # production build
 npm start              # serve the production build
 npm run typecheck      # tsc --noEmit
-npm test               # Vitest: 117 unit/integration tests
-npm run test:e2e       # Playwright: 6 browser tests (needs demo data + Chrome)
+npm test               # Vitest: 168 unit/integration tests
+npm run test:e2e       # Playwright: 11 browser tests (needs demo data + Chrome)
 npm run db:migrate     # apply pending SQL migrations
+npm run ocr:worker     # process queued OCR jobs (run alongside the app in production)
 ```
 
 Database scripts:

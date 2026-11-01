@@ -38,8 +38,8 @@ npm test
 **Result:**
 
 ```
-Test Files  15 passed (15)
-     Tests  117 passed (117)
+Test Files  34 passed (34)
+     Tests  168 passed (168)
   Duration  18.13s
 ```
 

@@ -31,9 +31,9 @@ Sign in with the generated password (written to `.data/initial-admin-credentials
 
 ```bash
 npx tsc --noEmit
-npm test          # 117 unit/integration tests
+npm test          # 168 unit/integration tests
 npm run build
-npm run test:e2e  # 6 browser tests; needs demo data + Chrome
+npm run test:e2e  # 11 browser tests; needs demo data + Chrome
 ```
 
 ## Documentation
